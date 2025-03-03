@@ -1,0 +1,209 @@
+{
+  "main": {
+    "id": "49646576e71b8f9f",
+    "type": "split",
+    "children": [
+      {
+        "id": "c9efbf0337d35ac8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "bca6d9594cce2f84",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "662a865e7d5ada86",
+    "type": "split",
+    "children": [
+      {
+        "id": "734ca708b2968c7e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "123a32eded9829bd",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "9c92779004ac0461",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "a482eae290f3178b",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 453.5
+  },
+  "right": {
+    "id": "fbebb0ca83b8221e",
+    "type": "split",
+    "children": [
+      {
+        "id": "d14564044f77b224",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "bab1011b50cdfa42",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "SOyR/practica_2/practica2.pdf",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for practica2"
+            }
+          },
+          {
+            "id": "ea4b48d8005aac03",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "SOyR/practica_2/practica2.pdf",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from practica2"
+            }
+          },
+          {
+            "id": "37c4790ec9c4e71c",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "605c0d974ff41faa",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Fundamentos/Filminas/FdCom_Com_17092024.pdf"
+              },
+              "icon": "lucide-list",
+              "title": "Outline of FdCom_Com_17092024"
+            }
+          }
+        ],
+        "currentTab": 3
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "pdf-plus:PDF++: Toggle auto-copy": false,
+      "pdf-plus:PDF++: Toggle auto-focus": false,
+      "pdf-plus:PDF++: Toggle auto-paste": false,
+      "workspaces:Manage workspace layouts": false,
+      "obsidian-git:Open Git source control": false,
+      "obsidian-excalidraw-plugin:New drawing": false
+    }
+  },
+  "active": "bca6d9594cce2f84",
+  "lastOpenFiles": [
+    "CE2/TP1/TP1.1-FuentesCCnoregu-230818.pdf",
+    "Fundamentos/Filminas/FdCom_Com_03102024.pdf",
+    "Fundamentos/Filminas/FdCom_Com_29102024.pdf",
+    "CE2/TP6/clase D_sinto _261223_1304-1.pdf",
+    "Fundamentos/Filminas/FdCom_Com_12112024.pdf",
+    "Fundamentos/Filminas/FdCom_Com_14112024.pdf",
+    "CE2/TP2/amplificadores de gran señal filminaspdf.pdf",
+    "Fundamentos/Filminas/FdCom_Com_21112024.pdf",
+    "CE2/CE2 Resumen Mod 2.md",
+    "CE2/TP6/TP6.2-AmpliAltoRen-231116-1.pdf",
+    "CE2/TP6/Teo6.2-AmpliAltoRen-1.pdf",
+    "Fundamentos/Notas Libro principle of communications.md",
+    "CE2/CE2 preguntas mod 2.md",
+    "CE2/TP2/TP2-AmpliaudioGS.pdf",
+    "Fundamentos/Funda Preguntas.md",
+    "Control 3/Notas Resumen Materia.md",
+    "Control 3/Control 3 preguntas.md",
+    "Pasted image 20250129103457.png",
+    "Pasted image 20250129103510.png",
+    "Pasted image 20250129111541.png",
+    "Control 3/TPA/4/codigo/README.md",
+    "CE2/practicas excalidraw/P6-TP4.excalidraw.md",
+    "mediciones_step_1.png",
+    "datos_prbs.png",
+    "resp_esc.png",
+    "resp_escalon_fopdt_sopdt.png",
+    "Datos.png",
+    "SOyR/Notas Monografia.md",
+    "Excalidraw/SOYR_TP4.excalidraw.md",
+    "SOyR/Notas.md",
+    "SOyR/practica_4/entregable_codigo/subnetting_total.jpg",
+    "SOyR/practica_4/entregable_codigo/red_subnetting_diseno.jpg",
+    "SOyR/practica_4/entregable_codigo/README.md",
+    "SOyR/practica_3/problema_6/README.md",
+    "Control 3/Untitled.md",
+    "Untitled.canvas",
+    "Control 3/TP 3/ej2.excalidraw.md"
+  ]
+}
