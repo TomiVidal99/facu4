@@ -11,13 +11,36 @@
             "id": "bca6d9594cce2f84",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "type": "pdf",
+              "state": {
+                "file": "Control de Sistemas Biologicos/TP1/02a-bioprocesos-Modelos-2025.pdf",
+                "page": 42,
+                "left": -69,
+                "top": 2,
+                "zoom": 1.011111111111111
+              },
+              "icon": "lucide-file-text",
+              "title": "02a-bioprocesos-Modelos-2025"
+            }
+          },
+          {
+            "id": "72fde144939f2b04",
+            "type": "leaf",
+            "state": {
+              "type": "pdf",
+              "state": {
+                "file": "Control de Sistemas Biologicos/TP1/02b-bioprocesos-Modelos cinéticos-2024.pdf",
+                "page": 11,
+                "left": -69,
+                "top": 544,
+                "zoom": 1.011111111111111
+              },
+              "icon": "lucide-file-text",
+              "title": "02b-bioprocesos-Modelos cinéticos-2024"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -74,7 +97,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 453.5
+    "width": 453.5,
+    "collapsed": true
   },
   "right": {
     "id": "fbebb0ca83b8221e",
@@ -158,30 +182,30 @@
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
+      "workspaces:Manage workspace layouts": false,
+      "obsidian-excalidraw-plugin:New drawing": false,
+      "obsidian-git:Open Git source control": false,
       "pdf-plus:PDF++: Toggle auto-copy": false,
       "pdf-plus:PDF++: Toggle auto-focus": false,
-      "pdf-plus:PDF++: Toggle auto-paste": false,
-      "workspaces:Manage workspace layouts": false,
-      "obsidian-git:Open Git source control": false,
-      "obsidian-excalidraw-plugin:New drawing": false
+      "pdf-plus:PDF++: Toggle auto-paste": false
     }
   },
-  "active": "bca6d9594cce2f84",
+  "active": "72fde144939f2b04",
   "lastOpenFiles": [
+    "Control de Sistemas Biologicos/Matlab/funcionModelo1.slx.bak",
+    "Control de Sistemas Biologicos/Matlab/funcionModelo1.slx",
+    "Control de Sistemas Biologicos/Matlab/modelos_cineticos_batch.mlx",
+    "Control de Sistemas Biologicos/Matlab",
+    "Control de Sistemas Biologicos/Nueva carpeta",
+    "Control de Sistemas Biologicos/TP1/02a-bioprocesos-Modelos-2025.pdf",
+    "Control de Sistemas Biologicos/TP1/02b-bioprocesos-Modelos cinéticos-2024.pdf",
     "CE2/TP1/TP1.1-FuentesCCnoregu-230818.pdf",
     "Fundamentos/Filminas/FdCom_Com_03102024.pdf",
     "Fundamentos/Filminas/FdCom_Com_29102024.pdf",
     "CE2/TP6/clase D_sinto _261223_1304-1.pdf",
-    "Fundamentos/Filminas/FdCom_Com_12112024.pdf",
-    "Fundamentos/Filminas/FdCom_Com_14112024.pdf",
-    "CE2/TP2/amplificadores de gran señal filminaspdf.pdf",
-    "Fundamentos/Filminas/FdCom_Com_21112024.pdf",
     "CE2/CE2 Resumen Mod 2.md",
-    "CE2/TP6/TP6.2-AmpliAltoRen-231116-1.pdf",
-    "CE2/TP6/Teo6.2-AmpliAltoRen-1.pdf",
     "Fundamentos/Notas Libro principle of communications.md",
     "CE2/CE2 preguntas mod 2.md",
-    "CE2/TP2/TP2-AmpliaudioGS.pdf",
     "Fundamentos/Funda Preguntas.md",
     "Control 3/Notas Resumen Materia.md",
     "Control 3/Control 3 preguntas.md",
