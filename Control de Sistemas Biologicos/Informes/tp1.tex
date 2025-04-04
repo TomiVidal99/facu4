@@ -1,0 +1,219 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+%        1         2         3         4         5         6         7         8
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}  % Comment this line out
+                                                          % if you need a4paper
+%\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4
+
+\usepackage{float}
+                                                          % paper
+% uso paquete bookmark para tener bien los outlines.
+\usepackage{bookmark}
+
+% Configuro el idioma.
+\usepackage[utf8]{inputenc} % Importante para mantener acentos.
+\usepackage[spanish, activeacute]{babel} % Requiere: texlive-lang-spanish. Por primera vez hay que ejecutar: texconfig init> log
+
+% Paquete para poder usar acentos en $$.
+\usepackage{mathtools}
+%\setmathfont{XITS math}
+
+% Para los diagramas de flujo
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows}
+
+% Elementos del diagrama
+\tikzstyle{startstop} = [rectangle, rounded corners, 
+minimum width=6em, 
+minimum height=2em,
+text centered, 
+draw=black, 
+fill=red!30]
+
+\tikzstyle{io} = [trapezium, 
+trapezium stretches=true, % A later addition
+trapezium left angle=70, 
+trapezium right angle=110, 
+minimum width=6em, 
+minimum height=2em, text centered, 
+draw=black, fill=blue!30]
+
+\tikzstyle{block} = [rectangle, 
+minimum width=8em, 
+minimum height=3em, 
+text centered, 
+text width=7.5em, 
+draw=black, 
+fill=white!30]
+
+\tikzstyle{def} = [rectangle, 
+minimum width=14em, 
+minimum height=3em, 
+text centered, 
+text width=12em, 
+draw=black, 
+fill=purple!30]
+
+\tikzstyle{swap_proccess} = [rectangle, 
+minimum width=8em, 
+minimum height=2em, 
+text centered, 
+text width=8em, 
+draw=black, 
+fill=orange!30]
+
+\tikzstyle{process} = [rectangle, 
+minimum width=6em, 
+minimum height=2em, 
+text centered, 
+text width=6em, 
+draw=black, 
+fill=orange!30]
+
+\tikzstyle{decision} = [diamond, 
+minimum width=6em, 
+minimum height=6em, 
+text centered, 
+draw=black, 
+fill=green!30]
+\tikzstyle{arrow} = [thick,->,>=stealth]
+
+\usepackage{siunitx}
+
+% package to get \url
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=magenta,
+  filecolor=magenta,
+  citecolor=magenta,      
+  urlcolor=magenta,
+}
+
+% Graficos electrónicos
+\usepackage[RPvoltages]{circuitikz}
+
+\IEEEoverridecommandlockouts                              % This command is only
+                                                          % needed if you want to
+                                                          % use the \thanks command
+\overrideIEEEmargins
+% See the \addtolength command later in the file to balance the column lengths
+% on the last page of the document
+
+\usepackage{graphicx}
+\usepackage{graphics}
+
+% styling for matlab/octave code.
+\usepackage{matlab-prettifier}
+% Configuracion, con esto puede agregar ñ.
+\lstset{
+  literate={ñ}{{\~n}}1
+}
+
+\usepackage{listings}
+
+% The following packages can be found on http:\\www.ctan.org
+%\usepackage{graphics} % for pdf, bitmapped graphics files
+%\usepackage{epsfig} % for postscript graphics files
+%\usepackage{mathptmx} % assumes new font selection scheme installed
+%\usepackage{times} % assumes new font selection scheme installed
+\usepackage{amsmath} % assumes amsmath package installed
+%\usepackage{amssymb}  % assumes amsmath package installed
+
+\title{\LARGE \bf Trabajo Práctico N° 1 Ejercicio 3}
+
+\author{
+  Tom\'as Vidal\\
+  {\it Control de sistemas biológicos}\\
+  {\it Facultad de Ingenier\'ia, UNLP, La Plata, Argentina.}\\
+  {\it 17 de Septiembre, 2024.}
+}                                            % <-this % stops a space
+% comienzo
+% INTRO
+
+% Figura
+\newcommand{\image}[2] {
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.43\textwidth]{./#1.png}
+    \caption{#2}
+    \label{fig:#1}
+  \end{figure}
+}
+
+% Codigo
+% \begin{lstlisting}[style=Matlab-editor]
+% % el código va aca
+% dispc("HELLO WORLD");
+% \end{lstlisting}
+
+\begin{document}
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  TITLE
+\begin{titlepage}
+	\centering
+	\null\vspace{4cm} % Adjust this value to push everything down
+	{\LARGE \textbf{Trabajo Práctico N° 1 Ejercicio 3} \par}
+	\vspace{2cm}
+	{\large Tomás Vidal \par}
+	{\itshape Control de sistemas biológicos \par}
+	{\itshape Facultad de Ingeniería, UNLP, La Plata, Argentina. \par}
+	{\itshape 17 de Septiembre, 2024. \par}
+	\vspace{2cm}
+	\includegraphics[width=0.55\textwidth]{unlp_logo.png}
+	\vfill % Pushes the content to properly center vertically
+\end{titlepage}
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+\section{Introducción}
+A continuación se muestran los resultados de simular la \textbf{producción} de \textit{polihidroxibutirato} (PHB)\footnote{El polihidroxibutirato (PHB) es un biopolímero perteneciente a la familia de los poliésteres, producido por diversas bacterias como reserva de carbono y energía. Es biodegradable y biocompatible, lo que lo hace una alternativa ecológica a los plásticos convencionales en aplicaciones médicas y envasado sostenible.}, y el \textbf{crecimiento} de la bacteria que lo produce para 3 casos diferentes alimentaciones de sustrato: \textbf{sin alimentación}, \textbf{alimentación constante} y \textbf{alimentación exponencial}. \\
+Las etapas de producción y crecimiento difieren en que la última requiere de nitrógeno, en cambio la etapa de producción de plástico require ausencia del mismo.
+
+\section{Modelo}
+El modelo a simular es el siguiente:
+
+\begin{equation*}
+	\begin{cases}
+    k_{S1} S + k_N N \xrightarrow{r_x} X + k_{P1} P \\
+    k_{S2} S \xrightarrow{r_p} P
+	\end{cases}
+\end{equation*}
+
+Que se puede llevar al siguiente sistema de ecuaciones:
+
+\begin{equation*}
+	\begin{cases}
+    \dot{x} = r_{x} \\
+    \dot{s} = -K_{s1}r_{x}  + D_{s}(s_{in}  - s) \\
+    \dot{s} = -K_{s2}r_{p}  + D_{s}(s_{in}  - s) \\
+    \dot{n} = -K_{N}r_{x}  + D_{n}(n_{in}  - n) \\
+    \dot{p} = K_{p1}r_{p} \\
+	\end{cases}
+\end{equation*}
+
+Y representándolo en su forma vectorial se tiene:
+
+\vspace{0.35cm}
+
+$
+\begin{bmatrix} \dot{x} \\ \dot{s} \\ \dot{n} \\ \dot{p} \end{bmatrix}
+=
+\begin{bmatrix} 1 & 0 \\ -K_{s1} & -K_{s2} \\ -K_{N} & 0 \\ K_{P1} & 1 \end{bmatrix}
+.
+\begin{bmatrix} r_{x} \\ r_{p} \end{bmatrix}
++
+\begin{pmatrix}
+  \begin{bmatrix} 0 & 0 \\ S_{in} & 0 \\ 0 & n_{in} \\ 0 & 0 \end{bmatrix}
+  -
+  \begin{bmatrix} x \\ s \\ n \\ p \end{bmatrix}
+  .
+  \begin{bmatrix} 1 & 1 \end{bmatrix}
+\end{pmatrix}
+.
+  \begin{bmatrix} D_{s} \\ D_{n} \end{bmatrix}
+$
+
+
+\section{Sin alimentación de sustrato}
+
+
+\end{document}
