@@ -212,8 +212,47 @@ $
   \begin{bmatrix} D_{s} \\ D_{n} \end{bmatrix}
 $
 
+Los modelos cinéticos empleados son:
+
+% TODO
 
 \section{Sin alimentación de sustrato}
+
+A continuación se muestran las simulaciones del caso donde no hay alimentación de sustrato, es decir $D_{s}=D_{n}=0$
+
+\subsection{Etapa de crecimiento}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_crecimiento_completo.png}
+  \caption{Etapa de crecimiento sin alimentación de sustrato}
+  \label{fig:D0_whole}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_mus.png}
+  \caption{Modelo cinético $\mu(s)$ en etapa de crecimiento}
+  \label{fig:D0_mu}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_plano_fase.png}
+  \caption{Plano de fase Sustrato/Biomasa en la etapa de crecimiento}
+  \label{fig:D0_fase}
+\end{figure}
+
+Como era de esperar se tiene un crecimiento exponencial de biomasa y, un decrecimiento exponencial de sustrato. Además se tiene que los modelos cinéticos son correctos durante la simulación, se llega al máximo en \textit{aproximadamente} $\sqrt{K_{s}K_{is}}$. También se tiene la recta esperada en el plano de fase.
+
+\subsection{Fase de producción de plástico}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_crecimiento_completo.png}
+  \caption{Etapa de crecimiento sin alimentación de sustrato}
+  \label{fig:D0_whole}
+\end{figure}
 
 
 \end{document}

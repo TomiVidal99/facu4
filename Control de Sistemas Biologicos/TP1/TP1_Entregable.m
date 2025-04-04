@@ -15,7 +15,6 @@
 clear all; close all; clc;
 
 %% Datos dados del modelo
-global mu_max Ks Kis Kn qp_max  Kps Kips Kipn;
 ks1=1/0.48;
 ks2=1/0.3;
 kn=1/8.9;
@@ -62,7 +61,7 @@ xi0=[x0;s0;n0;p0];
 simConfig.StopTime = "30";
 simConfig.Solver = 'ode1';
 simConfig.FixedStep = '0.01';
-sim_out = sim('TP1E3', simConfig);
+sim_out = sim('TP1EJ3', simConfig);
 
 i=1;
 sim_results{i}.time = sim_out.tout;
@@ -72,22 +71,102 @@ sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
 sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
 sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
 sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
 sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
 
-% Se grafica
+% Se grafica toda la etapa de crecimiento
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
 title('Fase de crecimiento');
-xlabel('tiempo [Horas]');
+xlabel('Tiempo [Horas]');
 ylabel('Masa [g]');
-i=1;
 plot(sim_results{i}.time, sim_results{i}.biomass.*sim_results{i}.v, 'LineWidth', 3);
 plot(sim_results{i}.time, sim_results{i}.sustrate.*sim_results{i}.v, 'LineWidth', 3);
 plot(sim_results{i}.time, sim_results{i}.nitrogen.*sim_results{i}.v, 'LineWidth', 3);
 legend('Biomasa', 'Sustrato', 'Nitrógeno');
 
 saveas(fig, '../Informes/Images_tp1/D0_crecimiento_completo', 'png');
+
+% Se grafica el mu teórico vs el mu simulado
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('\mu_{modelo}(s) vs \mu_{simulado}(s)');
+xlabel('sustrato');
+ylabel('\mu(s)');
+plot(sim_results{i}.sustrate, sim_results{i}.mu, 'LineWidth', 3);
+plot(sim_results{i}.sustrate, HaldaneMonodModel(sim_results{i}.sustrate, sim_results{i}.nitrogen, modelParameters.rx_params), 'k--', 'LineWidth', 3);
+xline(sqrt(Ks*Kis), 'r', 'LineWidth', 3);
+legend('Modelo', 'Simulación', '(K_{s}K_{is})^{1/2}');
+
+saveas(fig, '../Informes/Images_tp1/D0_mus', 'png');
+
+% Se grafica el plano de fase
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('Plano de fase');
+xlabel('Sustrato [g/g]');
+ylabel('Biomasa [g/g]');
+plot(sim_results{i}.sustrate, sim_results{i}.biomass, 'LineWidth', 3);
+
+saveas(fig, '../Informes/Images_tp1/D0_plano_fase', 'png');
+
+%% Fase de producción de plástico
+n0=0;
+sim_out = sim('TP1EJ3', simConfig);
+i=2;
+sim_results{i}.time = sim_out.tout;
+sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
+sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
+sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
+sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
+sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
+sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
+sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
+
+% Se grafica toda la etapa de crecimiento
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('Fase de producción de plástico');
+xlabel('Tiempo [Horas]');
+ylabel('Masa [g]');
+plot(sim_results{i}.time, sim_results{i}.biomass.*sim_results{i}.v, 'LineWidth', 3);
+plot(sim_results{i}.time, sim_results{i}.sustrate.*sim_results{i}.v, 'LineWidth', 3);
+plot(sim_results{i}.time, sim_results{i}.nitrogen.*sim_results{i}.v, 'LineWidth', 3);
+legend('Biomasa', 'Sustrato', 'Nitrógeno');
+
+saveas(fig, '../Informes/Images_tp1/D0_prod_completa', 'png');
+
+% Se grafica el mu teórico vs el mu simulado
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('\mu_{modelo}(s) vs \mu_{simulado}(s)');
+xlabel('sustrato');
+ylabel('\mu(s)');
+plot(sim_results{i}.sustrate, sim_results{i}.mu, 'LineWidth', 3);
+plot(sim_results{i}.sustrate, HaldaneMonodModel(sim_results{i}.sustrate, sim_results{i}.nitrogen, modelParameters.rx_params), 'k--', 'LineWidth', 3);
+xline(sqrt(Ks*Kis), 'r', 'LineWidth', 3);
+legend('Modelo', 'Simulación', '(K_{s}K_{is})^{1/2}');
+
+saveas(fig, '../Informes/Images_tp1/D0_mus', 'png');
+
+% Se grafica el plano de fase
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('Plano de fase');
+xlabel('Sustrato [g/g]');
+ylabel('Biomasa [g/g]');
+plot(sim_results{i}.sustrate, sim_results{i}.biomass, 'LineWidth', 3);
+
+saveas(fig, '../Informes/Images_tp1/D0_plano_fase', 'png');
 
 % %% Fase de crecimiento - Sin alimentación de sustrato
 % xi_in=[0,0; s_in,0; 0,n_in; 0,0];

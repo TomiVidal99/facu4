@@ -11,6 +11,6 @@ k1=params.k1;
 k2=params.k2;
 k3=params.k3;
 
-model = max * (s/( k1 + s + s*s/k2 )) * (1/(k3 + n));
+model = max .* (s./( k1 + s + s.*s./k2 )) .* (1./(k3 + n));
 
 end
