@@ -212,9 +212,32 @@ $
   \begin{bmatrix} D_{s} \\ D_{n} \end{bmatrix}
 $
 
+\vspace{1cm}
+
 Los modelos cinéticos empleados son:
 
-% TODO
+\begin{equation*}
+\mu(s,n) = \mu_{\text{max}} \frac{s}{K_S + s + \frac{s^2}{K_{is}}} \cdot \frac{n}{K_n + n}
+\end{equation*}
+
+\begin{equation*}
+q_p(s,n) = q_{p\text{max}} \frac{s}{K_{ps} + s + \frac{s^2}{K_{ips}}} \cdot \frac{K_{ipn}}{K_{ipn} + n}
+\end{equation*}
+
+Para realizar la simulación se hizo uso de simulink, a continuación se muestran los dos casos para cuando no se alimenta o se alimenta constantemente con sustrato, y el caso para cuando se alimenta exponencialmente con sustrato.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/simulink1.png}
+  \caption{Simulación para el caso de alimentación constante}
+  \label{fig:simulink1}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/simulink2.png}
+  \caption{Simulación para el caso de alimentación exponencial}
+  \label{fig:simulink2}
+\end{figure}
 
 \section{Sin alimentación de sustrato}
 
@@ -249,10 +272,69 @@ Como era de esperar se tiene un crecimiento exponencial de biomasa y, un decreci
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_crecimiento_completo.png}
-  \caption{Etapa de crecimiento sin alimentación de sustrato}
-  \label{fig:D0_whole}
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_prod_completa.png}
+  \caption{Etapa de producción de plástico con ``suficiente'' biomasa}
+  \label{fig:D0_prod_completa}
 \end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_prod_completa_min_biomass.png}
+  \caption{Etapa de producción de plástico con ``poca'' biomasa}
+  \label{fig:D0_prod_completa_min_biomass}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_plano_fase_plastic.png}
+  \caption{Plano de fase Sustrato/Plástico en la etapa de producción}
+  \label{fig:D0_fase_plastic}
+\end{figure}
+
+En la figura \ref{fig:D0_prod_completa} se puede observar que después de 10 horas, con 200 gramos de biomasa, \textbf{se obtuvieron 150 gramos de plástico}, a partir de los 500 gramos de sustrato que se consumieron. También se simulo un caso donde la biomasa es poca, en comparación a la cantidad de sustrato y los tiempos de producción, y no se alcanza a consumir el sustrato en las 30 horas de simulación.
+
+\section{Con alimentación de sustrato constante}
+
+\subsection{Fase de crecimiento}
+
+En esta fase se simula cuando se alimenta constantemente para diferentes valores de dilución
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_1.png}
+  \caption{Fase de crecimiento con alimentación constante}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_2.png}
+  \caption{Fase de crecimiento con alimentación constante}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_3.png}
+  \caption{Fase de crecimiento con alimentación constante}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_4.png}
+  \caption{Fase de crecimiento con alimentación constante}
+\end{figure}
+
+Como se puede observar en los gráficos, si se alimenta con poco no se llega a alimentar la biomasa, pero si se alimenta con demasiado sustrato entonces el mismo comienza a acumularse. En las siguientes simulaciones se toma un valor de dilución $D=0.1$, ya que es equilibrado con respecto a lo mencionado anteriormente.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_plano_fase.png}
+  \caption{Plano de fase en la fase de crecimiento de biomasa}
+\end{figure}
+
+\section{Con alimentación de sustrato exponencial}
+
+Se emplea el siguiente modelo para la alimentación exponencial:
+
+\begin{equation*}
+D = \frac{K_{s}\mu_{r}x_{0}e^{t*\mu_{r}}}{S_{in}-S_{r}}
+\end{equation*}
 
 
 \end{document}
