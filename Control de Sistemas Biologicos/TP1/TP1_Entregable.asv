@@ -291,7 +291,7 @@ n0=0;
 p0=0;
 s0=100;
 x0=40;
-D=0.01;
+D=0.1;
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
 xi0=[x0;s0;n0;p0];
 
@@ -324,7 +324,7 @@ legend('Sustrato', 'Plástico');
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title(sprintf('Plano de fase sustrato/plástico (D=%.3f)', D));
+title(sprintf('Plano de fase sustrato/plástico (D=%3)', D));
 xlabel('Sustrato [g/g]');
 ylabel('Biomasa [g/g]');
 plot(sim_results{i}.sustrate, sim_results{i}.plastic, 'LineWidth', 3);
