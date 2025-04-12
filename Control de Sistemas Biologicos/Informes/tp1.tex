@@ -254,44 +254,30 @@ A continuación se muestran las simulaciones del caso donde no hay alimentación
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_mus.png}
-  \caption{Modelo cinético $\mu(s)$ en etapa de crecimiento}
-  \label{fig:D0_mu}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
   \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_plano_fase.png}
   \caption{Plano de fase Sustrato/Biomasa en la etapa de crecimiento}
   \label{fig:D0_fase}
 \end{figure}
 
-Como era de esperar se tiene un crecimiento exponencial de biomasa y, un decrecimiento exponencial de sustrato. Además se tiene que los modelos cinéticos son correctos durante la simulación, se llega al máximo en \textit{aproximadamente} $\sqrt{K_{s}K_{is}}$. También se tiene la recta esperada en el plano de fase.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_mus.png}
+  \caption{Modelo cinético $\mu(s)$ en etapa de crecimiento}
+  \label{fig:D0_mu}
+\end{figure}
+
+Como era de esperar se tiene un crecimiento exponencial de biomasa y, un decrecimiento exponencial de sustrato. Además se tiene que los modelos cinéticos son correctos durante la simulación, se llega al máximo en \textit{aproximadamente} $\sqrt{K_{s}K_{is}}$. También se tiene la recta esperada en el plano de fase. Además se puede observar que para el caso cuando el nitrógeno inicial es 1g/g, no se tiene la producción de biomasa esperada, ya que no se cumplen las condiciones del modelo, que es que este estado se encuentre en abundancia.
 
 \subsection{Fase de producción de plástico}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_prod_completa.png}
-  \caption{Etapa de producción de plástico con ``suficiente'' biomasa}
+  \caption{Etapa de producción de plástico}
   \label{fig:D0_prod_completa}
 \end{figure}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_prod_completa_min_biomass.png}
-  \caption{Etapa de producción de plástico con ``poca'' biomasa}
-  \label{fig:D0_prod_completa_min_biomass}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D0_plano_fase_plastic.png}
-  \caption{Plano de fase Sustrato/Plástico en la etapa de producción}
-  \label{fig:D0_fase_plastic}
-\end{figure}
-
-En la figura \ref{fig:D0_prod_completa} se puede observar que después de 10 horas, con 200 gramos de biomasa, \textbf{se obtuvieron 150 gramos de plástico}, a partir de los 500 gramos de sustrato que se consumieron. También se simulo un caso donde la biomasa es poca, en comparación a la cantidad de sustrato y los tiempos de producción, y no se alcanza a consumir el sustrato en las 30 horas de simulación.
+En la figura \ref{fig:D0_prod_completa} se puede observar que cuando hay suficiente biomasa, el sustrato se convierte en plástico.
 
 \section{Con alimentación de sustrato constante}
 
@@ -301,32 +287,34 @@ En esta fase se simula cuando se alimenta constantemente para diferentes valores
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_1.png}
-  \caption{Fase de crecimiento con alimentación constante}
-\end{figure}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_2.png}
-  \caption{Fase de crecimiento con alimentación constante}
-\end{figure}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_3.png}
-  \caption{Fase de crecimiento con alimentación constante}
-\end{figure}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_4.png}
-  \caption{Fase de crecimiento con alimentación constante}
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_concentration.png}
+  \caption{Fase de crecimiento (en concentración) con alimentación constante}
 \end{figure}
 
-Como se puede observar en los gráficos, si se alimenta con poco no se llega a alimentar la biomasa, pero si se alimenta con demasiado sustrato entonces el mismo comienza a acumularse. En las siguientes simulaciones se toma un valor de dilución $D=0.1$, ya que es equilibrado con respecto a lo mencionado anteriormente.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_growth_complete_mass.png}
+  \caption{Fase de crecimiento (en masa) con alimentación constante}
+\end{figure}
+
+Como se puede observar en los gráficos, si se alimenta con poco no se llega a alimentar la biomasa, pero si se alimenta con demasiado sustrato entonces el mismo comienza a acumularse. Además se tienen los gráficos en masas y concentraciones, en el de concentraciones se puede ver que se llega a un estado estacionario, en cambio en el de las masas no, que es lo que se esperaba.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_plano_fase.png}
   \caption{Plano de fase en la fase de crecimiento de biomasa}
 \end{figure}
+
+\subsection{Fase de producción}
+Se hizo lo mismo que en la fase de crecimiento, pero para la de producción.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D1_plastic.png}
+  \caption{Fase de producción con diferentes valores de dilución}
+\end{figure}
+
+Se puede observar que el crecimiento es constante como se esperaba.
 
 \section{Con alimentación de sustrato exponencial}
 
@@ -336,5 +324,23 @@ Se emplea el siguiente modelo para la alimentación exponencial:
 D = \frac{K_{s}\mu_{r}x_{0}e^{t*\mu_{r}}}{S_{in}-S_{r}}
 \end{equation*}
 
+Donde $\mu_{r}$ y $s_{r}$ son valores de referencia de un punto elegido. A partir de los modelos cinéticos se eligieron puntos de referencia alrededor del mayor crecimiento. A continuación se muestran los resultados:
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D2_growth.png}
+  \caption{Etapa de crecimiento, alimentación exponencial}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D2_Ds.png}
+  \caption{Dilución exponencial}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.43\textwidth]{./Images_tp1/D2_plano_fase.png}
+  \caption{Plano de fase sustrato/plástico alimentación exponencial}
+\end{figure}
 
 \end{document}

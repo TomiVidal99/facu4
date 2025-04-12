@@ -10,6 +10,10 @@
 % suficiente así como lo es el sustrato.
 % - En la etapa de producción de plástico no tiene que haber nitrógeno para
 % que se dé la producción (es una condición de la bacteria).
+%
+% IMPORTANTE:
+% Si se corre por sección, correr al menos una vez todo secuencialmente.
+% Así se asegura de que todas las variables han sido definidas previamente.
 
 %%
 clear all; close all; clc;
@@ -37,6 +41,7 @@ v0=10;
 D=0;
 F=zeros(4,1);
 Q=zeros(4,1);
+i=1;
 
 % Defino los parámetros de los modelos cinéticos
 modelParameters.rx_params.max=mu_max;
@@ -59,29 +64,32 @@ simConfig.StopTime = num2str(sim_hours);
 simConfig.Solver = 'ode1';
 simConfig.FixedStep = '0.01';
 
-%% Fase de crecimiento - Sin alimentación de sustrato
-n0=5;
-p0=0;
-s0=50;
-x0=1;
+% -------------------------- Fase de crecimiento - Sin alimentación de sustrato
+%% Se grafica la biomasa y el sustrato en el tiempo para diferentes 
+% valores de biomasa incial y nitrógeno inicial
+
 D=0;
 
+init_cond = {[1, 100, 100, 0], [25, 100, 100, 0], [50, 100, 100, 0], [50, 100, 1, 0]};
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
-xi0=[x0;s0;n0;p0];
+% xi0=[x0;s0;n0;p0];
 
 % Ahora se grafica el plano de fase para los diferentes referencias (mur y sr)
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Plano de fase sustrato/plástico alimentación exponencial');
-xlabel('Sustrato [g/g]');
-ylabel('Biomasa [g/g]');
-legends=cell(1, length(references)); legend_counter=1;
-for j=1:length(references)
-    mur=references{j}(1);
-    sr=references{j}(2);
-    sim_out = sim('TP1EJ3_2', simConfig);
-    i=6+length(DD)+j;
+title('Crecimiento de biomasa');
+xlabel('Tiempo [Horas]');
+ylabel('Concentración [g/g]');
+legends=cell(1, length(init_cond)*2); legend_counter=1;
+for j=1:length(init_cond)
+    xi0 = init_cond{j};
+    x0=xi0(1);
+    s0=xi0(2);
+    n0=xi0(3);
+    p0=xi0(4);
+
+    sim_out = sim('TP1EJ3', simConfig);
     sim_results{i}.time = sim_out.tout;
     sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
     sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
@@ -89,47 +97,56 @@ for j=1:length(references)
     sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
     sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
     sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
-    % sim_results{i}.D = reshape(sim_out.D.Data, size(sim_results{i}.time));
+    sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+    sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
     sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
-    
-    % Se grafica toda la etapa de crecimiento con alimentación exponencial
-    plot(sim_results{i}.sustrate, sim_results{i}.plastic, 'LineWidth', 3);
-    legends{1, legend_counter}=sprintf("mur=%.3f, sr=%.3f", mur, sr);
-    legend_counter=legend_counter+1;
+
+    plot(sim_results{i}.time, sim_results{i}.biomass, 'LineWidth', 3);
+    plot(sim_results{i}.time, sim_results{i}.sustrate, '--', 'LineWidth', 3);
+
+    legends{1, legend_counter}=sprintf("Biomasa (x0=%d, n0=%d)", xi0(1), xi0(3));
+    legends{1, legend_counter+1}=sprintf("Sustrato (x0=%d, n0=%d)", xi0(1), xi0(3));
+    legend_counter=legend_counter+2;
 end
 legend(legends)
-saveas(fig, '../Informes/Images_tp1/D2_plano_fase_%d', 'png');
+saveas(fig, '../Informes/Images_tp1/D0_crecimiento_completo', 'png');
 
-% Los estados están representados en términos de concentraciones
-% por eso también calculo el volumen, para luego obtener las masas
-sim_out = sim('TP1EJ3', simConfig);
-i=1;
-sim_results{i}.time = sim_out.tout;
-sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
-sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
-sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
-sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
-sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
-sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
-sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
-sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
-sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
-
-% Se grafica toda la etapa de crecimiento
+%% Ahora se grafica el plano de fase para los diferentes valores inciales de biomasa
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Fase de crecimiento');
-xlabel('Tiempo [Horas]');
-ylabel('Masa [g]');
-plot(sim_results{i}.time, sim_results{i}.biomass.*sim_results{i}.v, 'LineWidth', 3);
-plot(sim_results{i}.time, sim_results{i}.sustrate.*sim_results{i}.v, 'LineWidth', 3);
-plot(sim_results{i}.time, sim_results{i}.nitrogen.*sim_results{i}.v, 'LineWidth', 3);
-legend('Biomasa', 'Sustrato', 'Nitrógeno');
+title('Plano de fase sustrato/plástico');
+xlabel('Sustrato [g/g]');
+ylabel('Biomasa [g/g]');
+legends=cell(1, length(init_cond)); legend_counter=1;
+for j=1:length(init_cond)
+    xi0 = init_cond{j};
+    x0=xi0(1);
+    s0=xi0(2);
+    n0=xi0(3);
+    p0=xi0(4);
 
-saveas(fig, '../Informes/Images_tp1/D0_crecimiento_completo', 'png');
+    sim_out = sim('TP1EJ3', simConfig);
+    sim_results{i}.time = sim_out.tout;
+    sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
+    sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
+    sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
+    sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
+    sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
+    sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+    sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+    sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
+    sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
+    
+    % Se grafica toda la etapa de crecimiento con alimentación exponencial
+    plot(sim_results{i}.sustrate, sim_results{i}.biomass, 'LineWidth', 3);
+    legends{1, legend_counter}=sprintf("x0=%d", xi0(1));
+    legend_counter=legend_counter+1;
+end
+legend(legends)
+saveas(fig, '../Informes/Images_tp1/D0_plano_fase', 'png');
 
-% Se grafica el mu teórico vs el mu simulado
+%% Se grafica el mu teórico vs el mu simulado
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
@@ -143,102 +160,53 @@ legend('Modelo', 'Simulación', '(K_{s}K_{is})^{1/2}');
 
 saveas(fig, '../Informes/Images_tp1/D0_mus', 'png');
 
-% Se grafica el plano de fase
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('Plano de fase sustrato/biomasa');
-xlabel('Sustrato [g/g]');
-ylabel('Biomasa [g/g]');
-plot(sim_results{i}.sustrate, sim_results{i}.biomass, 'LineWidth', 3);
+% --------------------------------------- Fase de producción de plástico
+%% Ahora se grafica la producción de plástico para diferentes valores de
+% biomasa inicial
+D=0;
 
-saveas(fig, '../Informes/Images_tp1/D0_plano_fase', 'png');
-
-%% Fase de producción de plástico
-% Se remueve el nitrógeno
-n0=0;
-p0=0;
-s0=50;
-x0=20;
-
+init_cond = {[1, 100, 0, 0], [25, 100, 0, 0], [50, 100, 0, 0]};
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
-xi0=[x0;s0;n0;p0];
 
-sim_out = sim('TP1EJ3', simConfig);
-i=2;
-sim_results{i}.time = sim_out.tout;
-sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
-sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
-sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
-sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
-sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
-sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
-sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
-sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
-sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
-
-% Se grafica toda la etapa de producción de plástico
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title(sprintf('Fase de producción de plástico (n_{0}=0, x_{0}=%d)', round(x0)));
+title('Producción de plástico (con alimentación)');
 xlabel('Tiempo [Horas]');
-ylabel('Masa [g]');
-plot(sim_results{i}.time, sim_results{i}.biomass.*sim_results{i}.v, 'LineWidth', 3);
-plot(sim_results{i}.time, sim_results{i}.sustrate.*sim_results{i}.v, 'LineWidth', 3);
-plot(sim_results{i}.time, sim_results{i}.plastic.*sim_results{i}.v, 'LineWidth', 3);
-legend('Biomasa', 'Sustrato', 'Plástico');
+ylabel('Concentraciones [g/g]');
+legends=cell(1, length(init_cond)*2); legend_counter=1;
+for j=1:length(init_cond)
+    xi0 = init_cond{j};
+    x0=xi0(1);
+    s0=xi0(2);
+    n0=xi0(3);
+    p0=xi0(4);
 
+    sim_out = sim('TP1EJ3', simConfig);
+    i=2;
+    sim_results{i}.time = sim_out.tout;
+    sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
+    sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
+    sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
+    sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
+    sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
+    sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+    sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+    sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
+    sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
+
+    plot(sim_results{i}.time, sim_results{i}.plastic, 'LineWidth', 3);
+    plot(sim_results{i}.time, sim_results{i}.sustrate, '--', 'LineWidth', 3);
+
+    legends{1, legend_counter}=sprintf("Plástico (x0=%d)", xi0(1));
+    legends{1, legend_counter+1}=sprintf("Sustrato (x0=%d)", xi0(1));
+    legend_counter=legend_counter+2;
+end
+legend(legends)
 saveas(fig, '../Informes/Images_tp1/D0_prod_completa', 'png');
 
-% Se remueve el nitrógeno
-n0=0;
-p0=0;
-s0=50;
-x0=1;
-
-xi_in=[0,0; s_in,0; 0,n_in; 0,0];
-xi0=[x0;s0;n0;p0];
-
-sim_out = sim('TP1EJ3', simConfig);
-i=3;
-sim_results{i}.time = sim_out.tout;
-sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
-sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
-sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
-sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
-sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
-sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
-sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
-sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
-sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
-
-% Se grafica toda la etapa de crecimiento
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title(sprintf('Fase de producción de plástico (n_{0}=0, x_{0}=%d)', round(x0)));
-xlabel('Tiempo [Horas]');
-ylabel('Masa [g]');
-plot(sim_results{i}.time, sim_results{i}.biomass.*sim_results{i}.v, 'LineWidth', 3);
-plot(sim_results{i}.time, sim_results{i}.sustrate.*sim_results{i}.v, 'LineWidth', 3);
-plot(sim_results{i}.time, sim_results{i}.plastic.*sim_results{i}.v, 'LineWidth', 3);
-legend('Biomasa', 'Sustrato', 'Plástico');
-
-saveas(fig, '../Informes/Images_tp1/D0_prod_completa_min_biomass', 'png');
-
-% Se grafica plano de fase sustrato/plástico
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('Plano de fase sustrato/plástico');
-xlabel('Sustrato [g/g]');
-ylabel('Plástico [g/g]');
-plot(sim_results{i}.sustrate, sim_results{i}.plastic, 'LineWidth', 3);
-
-saveas(fig, '../Informes/Images_tp1/D0_plano_fase_plastic', 'png');
-
-%% Fase de crecimiento - Con alimentación de sustrato constante
+% ------------------------- Fase de crecimiento - Con alimentación de sustrato constante
+%% Se grafica la fase de crecimiento para diferentes valores de dilución (D)
 n0=140;
 p0=0;
 s0=50;
@@ -247,15 +215,14 @@ DD=[0.005, 0.008, 0.01, 0.1, 0.4];
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
 xi0=[x0;s0;n0;p0];
 
-% Se simula el crecimiento para varios D
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Fase de crecimiento');
+title('Fase de crecimiento (concentraciones)');
 xlabel('Tiempo [Horas]');
-ylabel('Masa [g]');
-ylim([0 1e3]);
-legends=cell(1, length(DD)); legend_counter=1;
+ylabel('Concentración [g/g]');
+% ylim([0 1e3]);
+legends=cell(1, length(DD)*2); legend_counter=1;
 for j=1:length(DD)
 
     D=DD(j);
@@ -273,94 +240,151 @@ for j=1:length(DD)
     sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
     sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
     
-    % Se grafica toda la etapa de crecimiento
-    plot(sim_results{i}.time, sim_results{i}.biomass.*sim_results{i}.v, 'LineWidth', 3);
-    plot(sim_results{i}.time, sim_results{i}.sustrate.*sim_results{i}.v, '--', 'LineWidth', 3);
-    legends{1, legend_counter}=sprintf("Biomasa (D=%.2f)", D);
-    legends{1, legend_counter+1}=sprintf("Sustrato (D=%.2f)", D);
+    plot(sim_results{i}.time, sim_results{i}.biomass, 'LineWidth', 3);
+    plot(sim_results{i}.time, sim_results{i}.sustrate, '--', 'LineWidth', 3);
+
+    legends{1, legend_counter}=sprintf("Biomasa (D=%.3f)", D);
+    legends{1, legend_counter+1}=sprintf("Sustrato (D=%.3f)", D);
     legend_counter=legend_counter+2;
     
 end
 legend(legends);
-saveas(fig, '../Informes/Images_tp1/D1_growth_complete', 'png');
+saveas(fig, '../Informes/Images_tp1/D1_growth_complete_concentration', 'png');
 
-%% Se simula el plano de fase para  el crecimiento cuando D=0.1
+%% Se grafica la fase de crecimiento para diferentes valores de dilución (D)
+% Ahora con la masa en vez de la concentración
 n0=140;
 p0=0;
 s0=50;
 x0=20;
-D=0.1;
+DD=[0.005, 0.008, 0.01, 0.1, 0.4];
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
 xi0=[x0;s0;n0;p0];
 
-sim_out = sim('TP1EJ3', simConfig);
-i=4+length(DD);
-sim_results{i}.time = sim_out.tout;
-sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
-sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
-sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
-sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
-sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
-sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
-sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
-sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
-sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
-
-% Se grafica el plano de fase con D=0.1
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Plano de fase sustrato/biomasa (D=0.1)');
-xlabel('Sustrato [g/g]');
-ylabel('Biomasa [g/g]');
-plot(sim_results{i}.sustrate, sim_results{i}.biomass, 'LineWidth', 3);
+title('Fase de crecimiento (masa)');
+xlabel('Tiempo [Horas]');
+ylabel('Masa [g]');
+ylim([0 1e3]);
+legends=cell(1, length(DD)*2); legend_counter=1;
+for j=1:length(DD)
 
-saveas(fig, '../Informes/Images_tp1/D1_plano_fase', 'png');
+    D=DD(j);
 
-%% Se simula la fase de producción cuando D=0.1
-n0=0;
+    sim_out = sim('TP1EJ3', simConfig);
+    i=3+j;
+    sim_results{i}.time = sim_out.tout;
+    sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
+    sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
+    sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
+    sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
+    sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
+    sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+    sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+    sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
+    sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
+    
+    plot(sim_results{i}.time, sim_results{i}.biomass.*sim_results{i}.v, 'LineWidth', 3);
+    plot(sim_results{i}.time, sim_results{i}.sustrate.*sim_results{i}.v, '--', 'LineWidth', 3);
+
+    legends{1, legend_counter}=sprintf("Biomasa (D=%.3f)", D);
+    legends{1, legend_counter+1}=sprintf("Sustrato (D=%.3f)", D);
+    legend_counter=legend_counter+2;
+    
+end
+legend(legends);
+saveas(fig, '../Informes/Images_tp1/D1_growth_complete_mass', 'png');
+
+%% Se simula el plano de fase para diferentes valores de dilución (D)
+n0=140;
 p0=0;
-s0=100;
-x0=40;
-D=0.01;
+s0=50;
+x0=20;
+DD=[0.005, 0.008, 0.01, 0.1, 0.4];
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
 xi0=[x0;s0;n0;p0];
 
-simConfig.FixedStep = '0.001';
-sim_out = sim('TP1EJ3', simConfig);
-i=5+length(DD);
-sim_results{i}.time = sim_out.tout;
-sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
-sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
-sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
-sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
-sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
-sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
-sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
-sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
-sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
-
-% Se grafica la fase de producción de plástico con D=0.1
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title(sprintf('Fase de producción de plástico (D=%.3f)', D));
-xlabel('Tiempo [horas]');
-ylabel('Concentración [g/g]');
-plot(sim_results{i}.time, sim_results{i}.sustrate, 'LineWidth', 3);
-plot(sim_results{i}.time, sim_results{i}.plastic, 'LineWidth', 3);
-legend('Sustrato', 'Plástico');
-
-% Se grafica el plano de fase con D=0.1
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title(sprintf('Plano de fase sustrato/plástico (D=%.3f)', D));
+title('Fase de fase sustrato/biomasa');
 xlabel('Sustrato [g/g]');
 ylabel('Biomasa [g/g]');
-plot(sim_results{i}.sustrate, sim_results{i}.plastic, 'LineWidth', 3);
+% ylim([0 1e3]);
+legends=cell(1, length(DD)); legend_counter=1;
+for j=1:length(DD)
+    D=DD(j);
+
+    sim_out = sim('TP1EJ3', simConfig);
+    i=3+j;
+    sim_results{i}.time = sim_out.tout;
+    sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
+    sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
+    sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
+    sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
+    sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
+    sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+    sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+    sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
+    sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
+    
+    plot(sim_results{i}.sustrate, sim_results{i}.biomass, 'LineWidth', 3);
+
+    legends{1, legend_counter}=sprintf("(D=%.3f)", D);
+    legend_counter=legend_counter+1;
+    
+end
+legend(legends);
 
 saveas(fig, '../Informes/Images_tp1/D1_plano_fase', 'png');
+
+%% Se simula la fase de producción de plástico para diferentes valores de 
+% dilución (D)
+n0=140;
+p0=0;
+s0=50;
+x0=20;
+DD=[0.005, 0.008, 0.01, 0.1, 0.4];
+xi_in=[0,0; s_in,0; 0,n_in; 0,0];
+xi0=[x0;s0;n0;p0];
+
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('Producción');
+xlabel('Tiempo [Horas]');
+ylabel('Concentración [g/g]');
+% ylim([0 1e3]);
+legends=cell(1, length(DD)*2); legend_counter=1;
+for j=1:length(DD)
+    D=DD(j);
+
+    sim_out = sim('TP1EJ3', simConfig);
+    i=3+j;
+    sim_results{i}.time = sim_out.tout;
+    sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
+    sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
+    sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
+    sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
+    sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
+    sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+    sim_results{i}.mu = reshape(sim_out.mu.Data, size(sim_results{i}.time));
+    sim_results{i}.qp = reshape(sim_out.qp.Data, size(sim_results{i}.time));
+    sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
+    
+    plot(sim_results{i}.time, sim_results{i}.plastic, 'LineWidth', 3);
+    plot(sim_results{i}.time, sim_results{i}.sustrate, '--', 'LineWidth', 3);
+
+    legends{1, legend_counter}=sprintf("(D=%.3f)", D);
+    legends{1, legend_counter+1}=sprintf("(D=%.3f)", D);
+    legend_counter=legend_counter+2;
+    
+end
+legend(legends);
+
+saveas(fig, '../Informes/Images_tp1/D1_plastic', 'png');
 
 %% Fase de producción - Con alimentación de sustrato exponencial
 n0=0;
@@ -371,6 +395,7 @@ DD=zeros(1,1);
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
 xi0=[x0;s0;n0;p0];
 
+% Estos son los puntos de operación
 references={[0.103, 4.22], [0.103435, 3.57592]};
 
 simConfig.FixedStep = '0.01';
@@ -406,7 +431,7 @@ for j=1:length(references)
     legend_counter=legend_counter+2;
 end
 legend(legends);
-saveas(fig, '../Informes/Images_tp1/D2_mur_%d', 'png');
+saveas(fig, '../Informes/Images_tp1/D2_growth', 'png');
 
 % Se grafica la dilución 'D' para cada mu
 fig = figure();
@@ -456,4 +481,4 @@ for j=1:length(references)
     legend_counter=legend_counter+1;
 end
 legend(legends)
-saveas(fig, '../Informes/Images_tp1/D2_plano_fase_%d', 'png');
+saveas(fig, '../Informes/Images_tp1/D2_plano_fase', 'png');
