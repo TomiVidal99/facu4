@@ -69,6 +69,37 @@ D=0;
 xi_in=[0,0; s_in,0; 0,n_in; 0,0];
 xi0=[x0;s0;n0;p0];
 
+% Ahora se grafica el plano de fase para los diferentes referencias (mur y sr)
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('Plano de fase sustrato/plástico alimentación exponencial');
+xlabel('Sustrato [g/g]');
+ylabel('Biomasa [g/g]');
+legends=cell(1, length(references)); legend_counter=1;
+for j=1:length(references)
+    mur=references{j}(1);
+    sr=references{j}(2);
+    sim_out = sim('TP1EJ3_2', simConfig);
+    i=6+length(DD)+j;
+    sim_results{i}.time = sim_out.tout;
+    sim_results{i}.biomass = reshape(sim_out.x.Data, size(sim_results{i}.time));
+    sim_results{i}.sustrate = reshape(sim_out.s.Data, size(sim_results{i}.time));
+    sim_results{i}.nitrogen = reshape(sim_out.n.Data, size(sim_results{i}.time));
+    sim_results{i}.plastic = reshape(sim_out.p.Data, size(sim_results{i}.time));
+    sim_results{i}.rx = reshape(sim_out.rx.Data, size(sim_results{i}.time));
+    sim_results{i}.rp = reshape(sim_out.rp.Data, size(sim_results{i}.time));
+    % sim_results{i}.D = reshape(sim_out.D.Data, size(sim_results{i}.time));
+    sim_results{i}.v = reshape(sim_out.v.Data, size(sim_results{i}.time));
+    
+    % Se grafica toda la etapa de crecimiento con alimentación exponencial
+    plot(sim_results{i}.sustrate, sim_results{i}.plastic, 'LineWidth', 3);
+    legends{1, legend_counter}=sprintf("mur=%.3f, sr=%.3f", mur, sr);
+    legend_counter=legend_counter+1;
+end
+legend(legends)
+saveas(fig, '../Informes/Images_tp1/D2_plano_fase_%d', 'png');
+
 % Los estados están representados en términos de concentraciones
 % por eso también calculo el volumen, para luego obtener las masas
 sim_out = sim('TP1EJ3', simConfig);
@@ -224,7 +255,7 @@ title('Fase de crecimiento');
 xlabel('Tiempo [Horas]');
 ylabel('Masa [g]');
 ylim([0 1e3]);
-legends=cell(1, length(mus)); legend_counter=1;
+legends=cell(1, length(DD)); legend_counter=1;
 for j=1:length(DD)
 
     D=DD(j);
