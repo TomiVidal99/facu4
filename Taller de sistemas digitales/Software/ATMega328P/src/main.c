@@ -20,55 +20,60 @@
 #include "motors.h"
 // #include "uart.h"
 
+#define LOW 0
+#define HIGH 1
+#define SERVO_PERIOD (18500) // 20ms
+#define SERVO_PWM_MIN (480) // 550us
+#define SERVO_PWM_MAX (2100) // 2ms
+
 int main(void)
 {
-  init_motors_pwm();
+  // init_motors_pwm();
+  // MOTOR_RIGHT_SET_PWM(50);
 
   i2c_init();
   lcd_init();
   lcd_set_cursor(0, 0);
-  lcd_write_string("GIRANDO MOTOR:");
-  // lcd_set_cursor(1, 0);
-  // lcd_write_string("motores");
+  lcd_write_string("Servo test:");
 
-  _delay_ms(1000);
-  lcd_clear();
+  DDRB |= (1 << PB0);
 
-  uint8_t motor = MOTOR_RIGHT;
+  uint16_t counter = 0;
+  uint16_t switch_counter = 0;
+  uint8_t pulse_state = LOW;
+
+  uint16_t servo_duty_cycle = SERVO_PWM_MAX;
 
   while (1)
   {
-
-    lcd_set_cursor(1, 0);
-
-    if (motor == MOTOR_LEFT)
+    if (pulse_state == LOW && counter >= SERVO_PERIOD)
     {
-      lcd_write_string("Izquierdo  ");
-      MOTOR_LEFT_PWM(10);
-      MOTOR_RIGHT_PWM(0);
-      motor = MOTOR_RIGHT;
+      PORTB |= (1 << PB0);
+      counter = 0;
+      pulse_state = 1;
     }
-    else
+    else if (pulse_state == HIGH && counter >= servo_duty_cycle)
     {
-      lcd_write_string("Derecho    ");
-      MOTOR_LEFT_PWM(0);
-      MOTOR_RIGHT_PWM(10);
-      motor = MOTOR_LEFT;
+      PORTB &= ~(1 << PB0);
+      pulse_state = 0;
+      switch_counter++;
     }
+    counter++;
 
-    // sprintf(LCD_msg, "PWM CDT: %d%%", counter);
-    // lcd_set_cursor(0, 0);
-    // lcd_write_string((const char*)LCD_msg);
-
-    // OCR0A = 255 * counter / 100;
-
-    // if (counter > 99) {
-    //   counter = 0;
-    // } else {
-    //   counter++;
-    // }
-
-    _delay_ms(5000);
+    switch (switch_counter)
+    {
+    case 100:
+      servo_duty_cycle = SERVO_PWM_MIN;
+      break;
+    case 200:
+    {
+      servo_duty_cycle = SERVO_PWM_MAX;
+      switch_counter = 0;
+    }
+    break;
+    default:
+      break;
+    }
   }
   return 0;
 }
