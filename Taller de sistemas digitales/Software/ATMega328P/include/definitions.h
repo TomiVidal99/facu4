@@ -9,6 +9,5 @@
  * OCR0A = 128; // 50% duty cycle on motor 1
  * OCR2B = 200; // ~78% duty cycle on motor 2
  */
-void init_motors_pwm();
 void init_adc();
 void init_button_interrupt();
