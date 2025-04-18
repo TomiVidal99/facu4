@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "delay.h": "c",
+        "sleep.h": "c",
+        "k_phi_r.h": "c",
+        "k_phi_f.h": "c",
+        "ky.h": "c",
+        "definitions.h": "c",
+        "pid.h": "c",
+        "voltage_controller.h": "c",
+        "i2c_lcd.h": "c",
+        "config.h": "c"
+    }
+}
