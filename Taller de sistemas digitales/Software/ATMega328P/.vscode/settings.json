@@ -9,6 +9,7 @@
         "pid.h": "c",
         "voltage_controller.h": "c",
         "i2c_lcd.h": "c",
-        "config.h": "c"
+        "config.h": "c",
+        "motors.h": "c"
     }
 }
