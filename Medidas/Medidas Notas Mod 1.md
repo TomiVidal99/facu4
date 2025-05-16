@@ -4,6 +4,7 @@
 ## Índice
 
 - [1. Métodos de medidas](#1.%20Métodos%20de%20medidas)
+	- [Índice](##Índice)
 	- [1.1. Clasificaciones](##1.1.%20Clasificaciones)
 	- [1.2. Método de oposición](##1.2.%20Método%20de%20oposición)
 		- [1.2.1. Explicación](###1.2.1.%20Explicación)
@@ -14,6 +15,15 @@
 		- [1.4.2. Conexión larga](###1.4.2.%20Conexión%20larga)
 		- [1.4.3. IMPORTANTE: criterio para elegir entre la conexión corta o la conexión larga](###1.4.3.%20IMPORTANTE:%20criterio%20para%20elegir%20entre%20la%20conexión%20corta%20o%20la%20conexión%20larga)
 - [2. Resistores de muy alto valor](#2.%20Resistores%20de%20muy%20alto%20valor)
+- [3. Resistores de muy bajo valor](#3.%20Resistores%20de%20muy%20bajo%20valor)
+- [4. Método de Wheatstone](#4.%20Método%20de%20Wheatstone)
+- [5. Digital vs Analógico](#5.%20Digital%20vs%20Analógico)
+	- [5.2 Conversor de doble rampa](##5.2%20Conversor%20de%20doble%20rampa)
+- [6. Parámetros importantes de las señales en mediciones digitales](#6.%20Parámetros%20importantes%20de%20las%20señales%20en%20mediciones%20digitales)
+		- [6.1 Voltímetros de valor medio](###6.1%20Voltímetros%20de%20valor%20medio)
+		- [6.1.1 Error de Factor de Forma de Onda](###6.1.1%20Error%20de%20Factor%20de%20Forma%20de%20Onda)
+		- [6.2 Voltímetros de valor eficaz (True RMS)](###6.2%20Voltímetros%20de%20valor%20eficaz%20(True%20RMS))
+
 
 ---
 ## 1.1. Clasificaciones
