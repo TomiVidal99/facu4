@@ -14,28 +14,35 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "motors.h"
+
 #include "UART.h"
 
 #include "nrf24l01.h"
 #include "nrf24l01-mnemonics.h"
 
+#define DEBUG
+
 nRF24L01 *setup_rf(void);
 void process_message(char *message);
-inline void prepare_led_pin(void);
-inline void set_led_high(void);
-inline void set_led_low(void);
 
 volatile bool rf_interrupt = false;
 
+#ifdef DEBUG
 char *recv_message = "Receiver started...\n\r";
+#endif
 
 int main(void)
 {
+#ifdef DEBUG
   USART_init();
   USART_putstring(recv_message);
+#endif
 
+  init_motors_pwm();
+
+  // Settings for the nRF24
   uint8_t address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
-  prepare_led_pin();
   sei();
   nRF24L01 *rf = setup_rf();
   nRF24L01_listen(rf, 0, address);
@@ -83,32 +90,24 @@ nRF24L01 *setup_rf(void)
 
 void process_message(char *message)
 {
-  if (strcmp(message, "ON") == 0)
-    set_led_high();
-  else if (strcmp(message, "OFF") == 0)
-    set_led_low();
-}
-
-inline void prepare_led_pin(void)
-{
-  DDRB |= _BV(PB0);
-  PORTB &= ~_BV(PB0);
-}
-
-inline void set_led_high(void)
-{
-  PORTB |= _BV(PB0);
-
-  sprintf(recv_message, "HIGH\r\n");
-  USART_putstring(recv_message);
-}
-
-inline void set_led_low(void)
-{
-  PORTB &= ~_BV(PB0);
-
-  sprintf(recv_message, "LOW\n\r");
-  USART_putstring(recv_message);
+  if (strcmp(message, "S+") == 0)
+  {
+    OCR0A = 70;
+    OCR2B = 70;
+#ifdef DEBUG
+    sprintf(recv_message, "Speed at: %d", OCR0A);
+    USART_putstring(recv_message);
+#endif
+  }
+  else if (strcmp(message, "S-") == 0)
+  {
+    OCR0A = 0;
+    OCR2B = 0;
+#ifdef DEBUG
+    sprintf(recv_message, "Speed at: %d", OCR0A);
+    USART_putstring(recv_message);
+#endif
+  }
 }
 
 // nRF24L01 interrupt

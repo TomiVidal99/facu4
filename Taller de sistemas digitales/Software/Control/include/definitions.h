@@ -11,3 +11,6 @@
  */
 void init_adc();
 void init_button_interrupt();
+
+void adc_init();
+uint8_t adc_read(uint8_t channel);
