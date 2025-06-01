@@ -1,36 +1,45 @@
 #include <avr/io.h>
-#include <assert.h>
-
+#include <avr/interrupt.h>
 #include "servo.h"
 
-uint16_t __servo_counter = 0;
-uint16_t __servo_duty_cycle = SERVO_PWM_MAX;
-uint8_t __pulse_state = SERVO_BIT_LOW;
+volatile uint16_t __clock_counter_50us;
+volatile uint16_t __stop_time_50us;
 
 void SERVO_init(void)
 {
-    DDRB |= (1 << PB0);
+    TCCR2A = (1 << WGM21);
+    TCCR2B = (1 << CS21);
+    OCR2A = 99;
+    TIMSK2 = (1 << OCIE2A);
+    sei();
+
+    DDRD |= (1 << PD7);
+
+    __clock_counter_50us = 0;
+    __stop_time_50us = 11;
 }
 
-void SERVO_update(void)
+void SERVO_update()
 {
-    if (__pulse_state == SERVO_BIT_LOW && __servo_counter >= SERVO_PERIOD)
+    if (__clock_counter_50us <= 1)
     {
-        PORTB |= (1 << PB0);
-        __servo_counter = 0;
-        __pulse_state = 1;
+        PORTD |= (1 << PD7);
     }
-    else if (__pulse_state == SERVO_BIT_HIGH && __servo_counter >= __servo_duty_cycle)
+
+    if (__clock_counter_50us >= __stop_time_50us)
     {
-        PORTB &= ~(1 << PB0);
-        __pulse_state = 0;
+        PORTD &= ~(1 << PD7);
     }
-    __servo_counter++;
+
+    if (__clock_counter_50us >= 400)
+    {
+        __clock_counter_50us = 0;
+    }
+
+    __clock_counter_50us++;
 }
 
 void SERVO_set_angle(uint8_t degrees)
 {
-    // assert(degrees <= SERVO_MAX_ANGLE);
-
-    __servo_duty_cycle = SERVO_PWM_MAX *  (float)(degrees / SERVO_MAX_ANGLE);
+    __stop_time_50us = (11 * degrees + 550) / 50;
 }

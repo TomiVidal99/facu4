@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "nrf24l01.h"
 
 // - - - - - - - - - - -  FUNCIONES - - - - - - - - - -
 
@@ -11,3 +12,6 @@
  */
 void init_adc();
 void init_button_interrupt();
+
+nRF24L01 *setup_rf(void);
+void process_message(char *message);

@@ -25,6 +25,7 @@
 nRF24L01 *setup_rf(void);
 
 volatile bool rf_interrupt = false;
+char STATE[6] = "SSSAAA"; // example: +100180 -> velocidad 100 adelante, rotar 180 grados
 
 #ifdef DEBUG
 char *sender_message = "Sender started...\n\r";
@@ -54,30 +55,19 @@ int main(void)
         nRF24L01_flush_transmit_message(rf);
     }
 
-    uint16_t pot = adc_read(0);
+    uint8_t speed = adc_read(0);
+    uint8_t angle = adc_read(1);
+
+    sprintf(STATE, "%03d%03d", speed, angle);
+
 #ifdef DEBUG
-    sprintf(sender_message, "pot: %d\n\r", pot);
+    sprintf(sender_message, "%s\r\n", STATE);
     USART_putstring(sender_message);
 #endif
-    if (pot > 2)
-    // if (send_message)
-    {
-#ifdef DEBUG
-      USART_putstring(sender_message);
-#endif
-
-      nRF24L01Message msg;
-      memcpy(msg.data, "S+", 3);
-      msg.length = strlen((char *)msg.data) + 1;
-      nRF24L01_transmit(rf, to_address, &msg);
-    }
-    else
-    {
-      nRF24L01Message msg;
-      memcpy(msg.data, "S-", 3);
-      msg.length = strlen((char *)msg.data) + 1;
-      nRF24L01_transmit(rf, to_address, &msg);
-    }
+    nRF24L01Message msg;
+    memcpy(msg.data, STATE, 6);
+    msg.length = strlen((char *)msg.data) + 1;
+    nRF24L01_transmit(rf, to_address, &msg);
   }
 
   return 0;
@@ -117,9 +107,9 @@ void adc_init()
 
 uint8_t adc_read(uint8_t channel)
 {
-  ADMUX = (ADMUX & 0xF0) | (channel & 0x0F); // Select ADC channel
-  ADCSRA |= (1 << ADSC);                     // Start conversion
+  ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
+  ADCSRA |= (1 << ADSC);
   while (ADCSRA & (1 << ADSC))
-    ;          // Wait for conversion
-  return ADCH; // Return 10-bit result
+    ;
+  return (uint8_t)((ADC * 100UL) / 1023);
 }

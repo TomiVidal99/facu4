@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.m": "matlab",
-        "nrf24l01.h": "c"
+        "nrf24l01.h": "c",
+        "servo.h": "c"
     }
 }

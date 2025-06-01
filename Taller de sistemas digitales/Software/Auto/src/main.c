@@ -14,6 +14,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "definitions.h"
+
 #include "motors.h"
 
 #include "UART.h"
@@ -21,10 +23,11 @@
 #include "nrf24l01.h"
 #include "nrf24l01-mnemonics.h"
 
+#include "servo.h"
+
 #define DEBUG
 
-nRF24L01 *setup_rf(void);
-void process_message(char *message);
+#define MAX_SPEED 200
 
 volatile bool rf_interrupt = false;
 
@@ -40,6 +43,8 @@ int main(void)
 #endif
 
   init_motors_pwm();
+  SERVO_init();
+  SERVO_set_angle(90);
 
   // Settings for the nRF24
   uint8_t address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
@@ -68,6 +73,11 @@ int main(void)
   return 0;
 }
 
+ISR(TIMER2_COMPA_vect)
+{
+  SERVO_update();
+}
+
 nRF24L01 *setup_rf(void)
 {
   nRF24L01 *rf = nRF24L01_init();
@@ -90,23 +100,42 @@ nRF24L01 *setup_rf(void)
 
 void process_message(char *message)
 {
-  if (strcmp(message, "S+") == 0)
-  {
-    OCR0A = 70;
-    OCR2B = 70;
+  uint16_t speed_percentage;
+  uint16_t angle_percentage;
+  sscanf(message, "%3u%3u", &speed_percentage, &angle_percentage);
+
 #ifdef DEBUG
-    sprintf(recv_message, "Speed at: %d", OCR0A);
-    USART_putstring(recv_message);
+  sprintf(recv_message, "Message: %s\n\r\t", message);
+  USART_putstring(recv_message);
 #endif
+
+  if (speed_percentage > 55)
+  {
+    OCR0A = MAX_SPEED;
+    OCR0B = 0;
   }
-  else if (strcmp(message, "S-") == 0)
+  else if (speed_percentage < 45)
   {
     OCR0A = 0;
-    OCR2B = 0;
-#ifdef DEBUG
-    sprintf(recv_message, "Speed at: %d", OCR0A);
-    USART_putstring(recv_message);
-#endif
+    OCR0B = MAX_SPEED;
+  }
+  else
+  {
+    OCR0A = 0;
+    OCR0B = 0;
+  }
+
+  if (angle_percentage > 70)
+  {
+    SERVO_set_angle(180);
+  }
+  else if (angle_percentage < 30)
+  {
+    SERVO_set_angle(0);
+  }
+  else
+  {
+    SERVO_set_angle(90);
   }
 }
 
