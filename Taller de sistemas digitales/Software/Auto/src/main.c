@@ -1,146 +1,162 @@
-/*
- * main.c
- * Auto FPV
- * Author: Tomás Vidal
- */
-
-#ifndef F_CPU
 #define F_CPU 16000000UL
-#endif
+#define CLKB 262144UL
+#define CLKA 256UL
 
-#include <stdio.h> //  for sprintf
+// #include "noisech.h"
+#include <util/delay.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <stdbool.h>
-#include <string.h>
 
-#include "definitions.h"
+#define CLKB 262144UL
+#define CLKA 256UL
 
-#include "motors.h"
+uint16_t lfsr_shift(uint8_t width, uint16_t lfsr_reg);
+// uint16_t set_noise_envelope(void);
+void set_noise_freq(uint8_t div, uint8_t shift, uint8_t width); // div = 3 bits, wid 1 en 7, 0 en 15, shift = 4 bits
+uint8_t lfsr_get(uint16_t lfsr_reg);
+void noise_trigger(uint8_t length, uint8_t div, uint8_t shift, uint8_t width);
 
-#include "UART.h"
+volatile uint8_t noise_length = 1;
+volatile uint8_t noise_freq_counter;
+volatile uint8_t noise_freq_counter_aux;
+volatile uint16_t LFSRstatus = 0b00000000000000000;
+volatile uint8_t noise_width = 0;
 
-#include "nrf24l01.h"
-#include "nrf24l01-mnemonics.h"
+ISR(TIMER0_COMPA_vect)
+{
 
-#include "servo.h"
+    // Length control. This interrupt decreases length counter for each channel
+    // and checks if it should be turned off.
 
-#define DEBUG
+    if (noise_length > 0)
+    {
+        noise_length--;
+    }
 
-#define MAX_SPEED 200
+    if (noise_length == 0)
+    {
+        // PORTB ^= (1 << PB1);
+        PORTB |= (1 << PB1);
+        DDRC &= ~(1 << PC0); // Turn off PC0
+    }
+}
 
-volatile bool rf_interrupt = false;
+volatile uint8_t bit0;
+volatile uint8_t bit1;
+volatile uint8_t xnor_result;
+ISR(TIMER1_COMPA_vect)
+{
 
-#ifdef DEBUG
-char *recv_message = "Receiver started...\n\r";
-#endif
+    PORTB ^= (1 << PB0);
+
+    noise_freq_counter_aux--;
+
+    if (noise_freq_counter_aux == 0)
+    {
+
+        // LFSRstatus = lfsr_shift(noise_width, LFSRstatus); // 1 short, 0 long
+        bit0 = LFSRstatus & 1;
+        bit1 = (LFSRstatus >> 1) & 1;
+        xnor_result = ~(bit0 ^ bit1) & 1;
+
+        LFSRstatus = (LFSRstatus >> 1) | (xnor_result << 15);
+
+        if (noise_width == 1)
+            LFSRstatus = (LFSRstatus) | (xnor_result << 7);
+
+        PORTC = (PORTC & ~(1 << PC0)) | (((LFSRstatus & 1) & 0x01) << PC0);
+        noise_freq_counter_aux = noise_freq_counter;
+    }
+}
 
 int main(void)
 {
-#ifdef DEBUG
-  USART_init();
-  USART_putstring(recv_message);
-#endif
 
-  init_motors_pwm();
-  SERVO_init();
-  SERVO_set_angle(90);
+    // CONFIGURACION TIMER0 - DURATION
 
-  // Settings for the nRF24
-  uint8_t address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
-  sei();
-  nRF24L01 *rf = setup_rf();
-  nRF24L01_listen(rf, 0, address);
-  uint8_t addr[5];
-  nRF24L01_read_register(rf, CONFIG, addr, 1);
+    TCCR0A = (1 << WGM01); // CTC
 
-  while (true)
-  {
-    if (rf_interrupt)
+    OCR0A = 220; // COMPA value 256hz
+
+    TCCR0B = (1 << CS02); // 256 prescaler
+
+    TIMSK0 = (1 << OCIE0A); // Interrupt enable
+
+    // CONFIGURACION TIMER1 - NOISE FREQ
+
+    TCCR1B = (1 << WGM12) | (1 << CS10); // CTC, predscaler 0
+
+    OCR1A = 60; // COMPA value 262144hz
+
+    TIMSK1 = (1 << OCIE1A); // Interrupt enable
+
+    sei();
+
+    // CONFIGURACIÓN PUERTOS
+
+    DDRB = 0xF;
+    DDRC = 0x1;
+    DDRD = 0xF;
+
+    DDRB |= (1 << PB0);
+    DDRB |= (1 << PB1);
+
+    // INICIALIZACION LFSR
+
+    while (1)
     {
-      rf_interrupt = false;
-      while (nRF24L01_data_received(rf))
-      {
-        nRF24L01Message msg;
-        nRF24L01_read_received_data(rf, &msg);
-        process_message((char *)msg.data);
-      }
-
-      nRF24L01_listen(rf, 0, address);
+        noise_trigger(61, 1, 7, 0); // length 6 bits, div 3 bits, shift 4 bits, mode 1 bit
+        _delay_ms(10000);
     }
-  }
+}
+void set_noise_freq(uint8_t div, uint8_t shift, uint8_t width)
+{
 
-  return 0;
+    int divisor;
+
+    if (div > 0)
+    {
+        divisor = 8;
+    }
+    else
+    {
+        divisor = div << 4; //(div*16)
+    }
+
+    noise_freq_counter = CLKB / (CLKB / (divisor << shift));
+    noise_freq_counter_aux = noise_freq_counter;
+
+    noise_width = width;
 }
 
-ISR(TIMER2_COMPA_vect)
-{
-  SERVO_update();
+uint16_t lfsr_shift(uint8_t width, uint16_t lfsr_reg)
+{ // shifts LFSR register state.
+
+    uint8_t bit0 = lfsr_reg & 1;
+    uint8_t bit1 = (lfsr_reg >> 1) & 1;
+    uint8_t xnor_result = ~(bit0 ^ bit1) & 1;
+
+    lfsr_reg = (lfsr_reg >> 1) | (xnor_result << 15);
+
+    if (width == 1)
+
+        lfsr_reg = (lfsr_reg) | (xnor_result << 7);
+
+    return lfsr_reg;
 }
 
-nRF24L01 *setup_rf(void)
-{
-  nRF24L01 *rf = nRF24L01_init();
-  rf->ss.port = &PORTB;
-  rf->ss.pin = PB2; // 10
-  rf->ce.port = &PORTB;
-  rf->ce.pin = PB1; // 9
-  rf->sck.port = &PORTB;
-  rf->sck.pin = PB5; //  13
-  rf->mosi.port = &PORTB;
-  rf->mosi.pin = PB3; // 11
-  rf->miso.port = &PORTB;
-  rf->miso.pin = PB4; // 12
-  // interrupt on falling edge of INT0 (PD2)
-  EICRA |= _BV(ISC01);
-  EIMSK |= _BV(INT0);
-  nRF24L01_begin(rf);
-  return rf;
+uint8_t lfsr_get(uint16_t lfsr_reg)
+{ // Returns first bit of LFSR 16 bit register
+
+    return (lfsr_reg & 1);
 }
 
-void process_message(char *message)
+void noise_trigger(uint8_t length, uint8_t div, uint8_t shift, uint8_t width)
 {
-  uint16_t speed_percentage;
-  uint16_t angle_percentage;
-  sscanf(message, "%3u%3u", &speed_percentage, &angle_percentage);
 
-#ifdef DEBUG
-  sprintf(recv_message, "Message: %s\n\r\t", message);
-  USART_putstring(recv_message);
-#endif
+    set_noise_freq(div, shift, width);
 
-  if (speed_percentage > 55)
-  {
-    OCR0A = MAX_SPEED;
-    OCR0B = 0;
-  }
-  else if (speed_percentage < 45)
-  {
-    OCR0A = 0;
-    OCR0B = MAX_SPEED;
-  }
-  else
-  {
-    OCR0A = 0;
-    OCR0B = 0;
-  }
+    noise_length = length;
 
-  if (angle_percentage > 70)
-  {
-    SERVO_set_angle(180);
-  }
-  else if (angle_percentage < 30)
-  {
-    SERVO_set_angle(0);
-  }
-  else
-  {
-    SERVO_set_angle(90);
-  }
-}
-
-// nRF24L01 interrupt
-ISR(INT0_vect)
-{
-  rf_interrupt = true;
+    DDRC |= (1 << PC0); // Turns on PC0
 }

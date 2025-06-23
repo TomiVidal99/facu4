@@ -13,7 +13,7 @@ PROGRAMMER = arduino
 CONFIG_FILE = "C:\Users\tomii\Downloads\avrdude.conf" 
 BAUD = 57600
 AVRDUDE = "C:\Users\tomii\Downloads\avrdude.exe"
-COM_PORT = COM9
+COM_PORT = COM3
 
 # Source files
 SRC = src/*.c
