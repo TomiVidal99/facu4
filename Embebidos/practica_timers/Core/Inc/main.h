@@ -45,6 +45,8 @@ typedef enum {
 	EQUALIZER_LOW = 0x5,
 	FOLDER_SEARCH = 0x6,
 	FILES_SEARCH = 0x7,
+
+  DISPLAY_MENU_LENGTH,
 } DisplayMenu;
 
 typedef struct {
