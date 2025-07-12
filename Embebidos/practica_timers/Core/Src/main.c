@@ -24,7 +24,6 @@
 /* USER CODE BEGIN Includes */
 #include "fonts.h"
 #include "ssd1306.h"
-#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,6 +62,10 @@ const osThreadAttr_t acceptButtonTas_attributes = { .name = "acceptButtonTas",
 osThreadId_t cancelButtonTasHandle;
 const osThreadAttr_t cancelButtonTas_attributes = { .name = "cancelButtonTas",
 		.stack_size = 128 * 4, .priority = (osPriority_t) osPriorityLow, };
+/* Definitions for encoderTask */
+osThreadId_t encoderTaskHandle;
+const osThreadAttr_t encoderTask_attributes = { .name = "encoderTask",
+		.stack_size = 128 * 4, .priority = (osPriority_t) osPriorityLow, };
 /* USER CODE BEGIN PV */
 
 static DisplayParams displayParams = { .menu = START };
@@ -71,6 +74,125 @@ const ButtonParams acceptButtonParams = { .type = ACCEPT, .port = GPIOA, .pin =
 GPIO_PIN_3 };
 const ButtonParams cancelButtonParams = { .type = CANCEL, .port = GPIOA, .pin =
 GPIO_PIN_2 };
+
+uint32_t prev_point_angle = 0;
+uint32_t point_angle = 0;
+
+// Para no usar 'math.h' uso una tabla de valores
+const float sin_table[361] = { 0.00000f, 0.03490f, 0.06976f, 0.10453f, 0.13917f,
+		0.17365f, 0.20791f, 0.24192f, 0.27564f, 0.30902f, 0.34202f, 0.37461f,
+		0.40674f, 0.43837f, 0.46947f, 0.50000f, 0.52992f, 0.55919f, 0.58779f,
+		0.61566f, 0.64279f, 0.66913f, 0.69466f, 0.71934f, 0.74314f, 0.76604f,
+		0.78801f, 0.80902f, 0.82904f, 0.84805f, 0.86603f, 0.88295f, 0.89879f,
+		0.91355f, 0.92718f, 0.93969f, 0.95106f, 0.96126f, 0.97030f, 0.97815f,
+		0.98481f, 0.99027f, 0.99452f, 0.99756f, 0.99939f, 1.00000f, 0.99939f,
+		0.99756f, 0.99452f, 0.99027f, 0.98481f, 0.97815f, 0.97030f, 0.96126f,
+		0.95106f, 0.93969f, 0.92718f, 0.91355f, 0.89879f, 0.88295f, 0.86603f,
+		0.84805f, 0.82904f, 0.80902f, 0.78801f, 0.76604f, 0.74314f, 0.71934f,
+		0.69466f, 0.66913f, 0.64279f, 0.61566f, 0.58779f, 0.55919f, 0.52992f,
+		0.50000f, 0.46947f, 0.43837f, 0.40674f, 0.37461f, 0.34202f, 0.30902f,
+		0.27564f, 0.24192f, 0.20791f, 0.17365f, 0.13917f, 0.10453f, 0.06976f,
+		0.03490f, 0.00000f, -0.03490f, -0.06976f, -0.10453f, -0.13917f,
+		-0.17365f, -0.20791f, -0.24192f, -0.27564f, -0.30902f, -0.34202f,
+		-0.37461f, -0.40674f, -0.43837f, -0.46947f, -0.50000f, -0.52992f,
+		-0.55919f, -0.58779f, -0.61566f, -0.64279f, -0.66913f, -0.69466f,
+		-0.71934f, -0.74314f, -0.76604f, -0.78801f, -0.80902f, -0.82904f,
+		-0.84805f, -0.86603f, -0.88295f, -0.89879f, -0.91355f, -0.92718f,
+		-0.93969f, -0.95106f, -0.96126f, -0.97030f, -0.97815f, -0.98481f,
+		-0.99027f, -0.99452f, -0.99756f, -0.99939f, -1.00000f, -0.99939f,
+		-0.99756f, -0.99452f, -0.99027f, -0.98481f, -0.97815f, -0.97030f,
+		-0.96126f, -0.95106f, -0.93969f, -0.92718f, -0.91355f, -0.89879f,
+		-0.88295f, -0.86603f, -0.84805f, -0.82904f, -0.80902f, -0.78801f,
+		-0.76604f, -0.74314f, -0.71934f, -0.69466f, -0.66913f, -0.64279f,
+		-0.61566f, -0.58779f, -0.55919f, -0.52992f, -0.50000f, -0.46947f,
+		-0.43837f, -0.40674f, -0.37461f, -0.34202f, -0.30902f, -0.27564f,
+		-0.24192f, -0.20791f, -0.17365f, -0.13917f, -0.10453f, -0.06976f,
+		-0.03490f, -0.00000f, 0.03490f, 0.06976f, 0.10453f, 0.13917f, 0.17365f,
+		0.20791f, 0.24192f, 0.27564f, 0.30902f, 0.34202f, 0.37461f, 0.40674f,
+		0.43837f, 0.46947f, 0.50000f, 0.52992f, 0.55919f, 0.58779f, 0.61566f,
+		0.64279f, 0.66913f, 0.69466f, 0.71934f, 0.74314f, 0.76604f, 0.78801f,
+		0.80902f, 0.82904f, 0.84805f, 0.86603f, 0.88295f, 0.89879f, 0.91355f,
+		0.92718f, 0.93969f, 0.95106f, 0.96126f, 0.97030f, 0.97815f, 0.98481f,
+		0.99027f, 0.99452f, 0.99756f, 0.99939f, 1.00000f, 0.99939f, 0.99756f,
+		0.99452f, 0.99027f, 0.98481f, 0.97815f, 0.97030f, 0.96126f, 0.95106f,
+		0.93969f, 0.92718f, 0.91355f, 0.89879f, 0.88295f, 0.86603f, 0.84805f,
+		0.82904f, 0.80902f, 0.78801f, 0.76604f, 0.74314f, 0.71934f, 0.69466f,
+		0.66913f, 0.64279f, 0.61566f, 0.58779f, 0.55919f, 0.52992f, 0.50000f,
+		0.46947f, 0.43837f, 0.40674f, 0.37461f, 0.34202f, 0.30902f, 0.27564f,
+		0.24192f, 0.20791f, 0.17365f, 0.13917f, 0.10453f, 0.06976f, 0.03490f,
+		0.00000f, -0.03490f, -0.06976f, -0.10453f, -0.13917f, -0.17365f,
+		-0.20791f, -0.24192f, -0.27564f, -0.30902f, -0.34202f, -0.37461f,
+		-0.40674f, -0.43837f, -0.46947f, -0.50000f, -0.52992f, -0.55919f,
+		-0.58779f, -0.61566f, -0.64279f, -0.66913f, -0.69466f, -0.71934f,
+		-0.74314f, -0.76604f, -0.78801f, -0.80902f, -0.82904f, -0.84805f,
+		-0.86603f, -0.88295f, -0.89879f, -0.91355f, -0.92718f, -0.93969f,
+		-0.95106f, -0.96126f, -0.97030f, -0.97815f, -0.98481f, -0.99027f,
+		-0.99452f, -0.99756f, -0.99939f, -1.00000f, -0.99939f, -0.99756f,
+		-0.99452f, -0.99027f, -0.98481f, -0.97815f, -0.97030f, -0.96126f,
+		-0.95106f, -0.93969f, -0.92718f, -0.91355f, -0.89879f, -0.88295f,
+		-0.86603f, -0.84805f, -0.82904f, -0.80902f, -0.78801f, -0.76604f,
+		-0.74314f, -0.71934f, -0.69466f, -0.66913f, -0.64279f, -0.61566f,
+		-0.58779f, -0.55919f, -0.52992f, -0.50000f, -0.46947f, -0.43837f,
+		-0.40674f, -0.37461f, -0.34202f, -0.30902f, -0.27564f, -0.24192f,
+		-0.20791f, -0.17365f, -0.13917f, -0.10453f, -0.06976f, -0.00000f };
+
+const float cos_table[361] = { 1.00000f, 0.99939f, 0.99756f, 0.99452f, 0.99027f,
+		0.98481f, 0.97815f, 0.97030f, 0.96126f, 0.95106f, 0.93969f, 0.92718f,
+		0.91355f, 0.89879f, 0.88295f, 0.86603f, 0.84805f, 0.82904f, 0.80902f,
+		0.78801f, 0.76604f, 0.74314f, 0.71934f, 0.69466f, 0.66913f, 0.64279f,
+		0.61566f, 0.58779f, 0.55919f, 0.52992f, 0.50000f, 0.46947f, 0.43837f,
+		0.40674f, 0.37461f, 0.34202f, 0.30902f, 0.27564f, 0.24192f, 0.20791f,
+		0.17365f, 0.13917f, 0.10453f, 0.06976f, 0.03490f, 0.00000f, -0.03490f,
+		-0.06976f, -0.10453f, -0.13917f, -0.17365f, -0.20791f, -0.24192f,
+		-0.27564f, -0.30902f, -0.34202f, -0.37461f, -0.40674f, -0.43837f,
+		-0.46947f, -0.50000f, -0.52992f, -0.55919f, -0.58779f, -0.61566f,
+		-0.64279f, -0.66913f, -0.69466f, -0.71934f, -0.74314f, -0.76604f,
+		-0.78801f, -0.80902f, -0.82904f, -0.84805f, -0.86603f, -0.88295f,
+		-0.89879f, -0.91355f, -0.92718f, -0.93969f, -0.95106f, -0.96126f,
+		-0.97030f, -0.97815f, -0.98481f, -0.99027f, -0.99452f, -0.99756f,
+		-0.99939f, -1.00000f, -0.99939f, -0.99756f, -0.99452f, -0.99027f,
+		-0.98481f, -0.97815f, -0.97030f, -0.96126f, -0.95106f, -0.93969f,
+		-0.92718f, -0.91355f, -0.89879f, -0.88295f, -0.86603f, -0.84805f,
+		-0.82904f, -0.80902f, -0.78801f, -0.76604f, -0.74314f, -0.71934f,
+		-0.69466f, -0.66913f, -0.64279f, -0.61566f, -0.58779f, -0.55919f,
+		-0.52992f, -0.50000f, -0.46947f, -0.43837f, -0.40674f, -0.37461f,
+		-0.34202f, -0.30902f, -0.27564f, -0.24192f, -0.20791f, -0.17365f,
+		-0.13917f, -0.10453f, -0.06976f, -0.03490f, -0.00000f, 0.03490f,
+		0.06976f, 0.10453f, 0.13917f, 0.17365f, 0.20791f, 0.24192f, 0.27564f,
+		0.30902f, 0.34202f, 0.37461f, 0.40674f, 0.43837f, 0.46947f, 0.50000f,
+		0.52992f, 0.55919f, 0.58779f, 0.61566f, 0.64279f, 0.66913f, 0.69466f,
+		0.71934f, 0.74314f, 0.76604f, 0.78801f, 0.80902f, 0.82904f, 0.84805f,
+		0.86603f, 0.88295f, 0.89879f, 0.91355f, 0.92718f, 0.93969f, 0.95106f,
+		0.96126f, 0.97030f, 0.97815f, 0.98481f, 0.99027f, 0.99452f, 0.99756f,
+		0.99939f, 1.00000f, 0.99939f, 0.99756f, 0.99452f, 0.99027f, 0.98481f,
+		0.97815f, 0.97030f, 0.96126f, 0.95106f, 0.93969f, 0.92718f, 0.91355f,
+		0.89879f, 0.88295f, 0.86603f, 0.84805f, 0.82904f, 0.80902f, 0.78801f,
+		0.76604f, 0.74314f, 0.71934f, 0.69466f, 0.66913f, 0.64279f, 0.61566f,
+		0.58779f, 0.55919f, 0.52992f, 0.50000f, 0.46947f, 0.43837f, 0.40674f,
+		0.37461f, 0.34202f, 0.30902f, 0.27564f, 0.24192f, 0.20791f, 0.17365f,
+		0.13917f, 0.10453f, 0.06976f, 0.03490f, 0.00000f, -0.03490f, -0.06976f,
+		-0.10453f, -0.13917f, -0.17365f, -0.20791f, -0.24192f, -0.27564f,
+		-0.30902f, -0.34202f, -0.37461f, -0.40674f, -0.43837f, -0.46947f,
+		-0.50000f, -0.52992f, -0.55919f, -0.58779f, -0.61566f, -0.64279f,
+		-0.66913f, -0.69466f, -0.71934f, -0.74314f, -0.76604f, -0.78801f,
+		-0.80902f, -0.82904f, -0.84805f, -0.86603f, -0.88295f, -0.89879f,
+		-0.91355f, -0.92718f, -0.93969f, -0.95106f, -0.96126f, -0.97030f,
+		-0.97815f, -0.98481f, -0.99027f, -0.99452f, -0.99756f, -0.99939f,
+		-1.00000f, -0.99939f, -0.99756f, -0.99452f, -0.99027f, -0.98481f,
+		-0.97815f, -0.97030f, -0.96126f, -0.95106f, -0.93969f, -0.92718f,
+		-0.91355f, -0.89879f, -0.88295f, -0.86603f, -0.84805f, -0.82904f,
+		-0.80902f, -0.78801f, -0.76604f, -0.74314f, -0.71934f, -0.69466f,
+		-0.66913f, -0.64279f, -0.61566f, -0.58779f, -0.55919f, -0.52992f,
+		-0.50000f, -0.46947f, -0.43837f, -0.40674f, -0.37461f, -0.34202f,
+		-0.30902f, -0.27564f, -0.24192f, -0.20791f, -0.17365f, -0.13917f,
+		-0.10453f, -0.06976f, -0.03490f, -0.00000f, 0.03490f, 0.06976f,
+		0.10453f, 0.13917f, 0.17365f, 0.20791f, 0.24192f, 0.27564f, 0.30902f,
+		0.34202f, 0.37461f, 0.40674f, 0.43837f, 0.46947f, 0.50000f, 0.52992f,
+		0.55919f, 0.58779f, 0.61566f, 0.64279f, 0.66913f, 0.69466f, 0.71934f,
+		0.74314f, 0.76604f, 0.78801f, 0.80902f, 0.82904f, 0.84805f, 0.86603f,
+		0.88295f, 0.89879f, 0.91355f, 0.92718f, 0.93969f, 0.95106f, 0.96126f,
+		0.97030f, 0.97815f, 0.98481f, 0.99027f, 0.99452f, 0.99756f, 0.99939f,
+		1.00000f };
 
 /* USER CODE END PV */
 
@@ -81,6 +203,7 @@ static void MX_I2C1_Init(void);
 void StartDefaultTask(void *argument);
 void menu(void *argument);
 void handleButtonPress(void *argument);
+void handleEncoder(void *argument);
 
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
@@ -149,8 +272,8 @@ int main(void) {
 
 	/* Create the thread(s) */
 	/* creation of defaultTask */
-//	defaultTaskHandle = osThreadNew(StartDefaultTask, NULL,
-//			&defaultTask_attributes);
+	defaultTaskHandle = osThreadNew(StartDefaultTask, NULL,
+			&defaultTask_attributes);
 
 	/* creation of menuTask */
 	menuTaskHandle = osThreadNew(menu, (void*) (&displayParams),
@@ -163,6 +286,10 @@ int main(void) {
 	/* creation of cancelButtonTas */
 	cancelButtonTasHandle = osThreadNew(handleButtonPress,
 			(void*) (&cancelButtonParams), &cancelButtonTas_attributes);
+
+	/* creation of encoderTask */
+	encoderTaskHandle = osThreadNew(handleEncoder, NULL,
+			&encoderTask_attributes);
 
 	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -183,7 +310,6 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-
 	}
 	/* USER CODE END 3 */
 }
@@ -253,7 +379,6 @@ static void MX_I2C1_Init(void) {
 	/* USER CODE BEGIN I2C1_Init 2 */
 
 	/* USER CODE END I2C1_Init 2 */
-
 }
 
 /**
@@ -283,8 +408,8 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : PA2 PA3 */
-	GPIO_InitStruct.Pin = GPIO_PIN_2 | GPIO_PIN_3;
+	/*Configure GPIO pins : PA2 PA3 PA6 PA7 */
+	GPIO_InitStruct.Pin = GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_6 | GPIO_PIN_7;
 	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -296,6 +421,20 @@ static void MX_GPIO_Init(void) {
 
 /* USER CODE BEGIN 4 */
 
+// Esta es una aproximacion de la sqrt de 'math.h' para evitar su importación
+// hay otras aproximaciones también
+float fast_sqrt(float number) {
+	if (number == 0.0f)
+		return 0.0f;
+	float x2 = number * 0.5f;
+	float y = number;
+	long i = *(long*) &y;
+	i = 0x5f3759df - (i >> 1);
+	y = *(float*) &i;
+	y = y * (1.5f - (x2 * y * y));
+	return number * y;
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -304,13 +443,16 @@ static void MX_GPIO_Init(void) {
  * @param  argument: Not used
  * @retval None
  */
+uint32_t lastInteractionTick = 0;
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument) {
 	/* USER CODE BEGIN 5 */
 	/* Infinite loop */
 	for (;;) {
-		osDelay(1);
-
+		if (HAL_GetTick() - lastInteractionTick > 60000) {
+			displayParams.menu = START;
+		}
+		osDelay(100);
 	}
 	/* USER CODE END 5 */
 }
@@ -329,12 +471,10 @@ void menu(void *argument) {
 	DisplayMenu menu = START;
 	DisplayMenu prevMenu = START;
 
-	float prev_point_angle = 0;
-	float point_angle = 0;
-
 	const uint16_t halfWidth = SCREEN_WIDTH / 2;
 	const uint16_t halfHeight = SCREEN_HEIGHT / 2;
 
+	uint32_t temp_angle;
 	for (;;) {
 
 		menu = ((DisplayParams*) argument)->menu;
@@ -347,52 +487,68 @@ void menu(void *argument) {
 		switch (menu) {
 		case START:
 
+			SSD1306_DrawFilledCircle(halfWidth, halfHeight,
+			SCREEN_HEIGHT / 3 + 7, SSD1306_COLOR_BLACK);
+
+			temp_angle =
+					prev_point_angle + 60 > 360 ?
+							(prev_point_angle + 60) - 360 :
+							prev_point_angle + 60;
 			SSD1306_DrawFilledCircle(
-					halfWidth + SCREEN_HEIGHT / 3 * cos(prev_point_angle - 10),
-					halfHeight + SCREEN_HEIGHT / 3 * sin(prev_point_angle - 10),
-					6, SSD1306_COLOR_BLACK);
-			SSD1306_DrawFilledCircle(
-					halfWidth + SCREEN_HEIGHT / 3 * cos(point_angle - 10),
-					halfHeight + SCREEN_HEIGHT / 3 * sin(point_angle - 10), 6,
+					halfWidth + SCREEN_HEIGHT / 3 * cos_table[temp_angle],
+					halfHeight + SCREEN_HEIGHT / 3 * sin_table[temp_angle], 6,
 					SSD1306_COLOR_WHITE);
 
+			temp_angle =
+					prev_point_angle + 30 > 360 ?
+							(prev_point_angle + 30) - 360 :
+							prev_point_angle + 30;
 			SSD1306_DrawFilledCircle(
-					halfWidth + SCREEN_HEIGHT / 3 * cos(prev_point_angle - 5),
-					halfHeight + SCREEN_HEIGHT / 3 * sin(prev_point_angle - 5),
-					4, SSD1306_COLOR_BLACK);
-			SSD1306_DrawFilledCircle(
-					halfWidth + SCREEN_HEIGHT / 3 * cos(point_angle - 5),
-					64 / 2 + 64 / 3 * sin(point_angle - 5), 4,
+					halfWidth + SCREEN_HEIGHT / 3 * cos_table[temp_angle],
+					64 / 2 + 64 / 3 * sin_table[temp_angle], 4,
 					SSD1306_COLOR_WHITE);
-
 			SSD1306_DrawFilledCircle(
-					halfWidth + SCREEN_HEIGHT / 3 * cos(prev_point_angle),
-					halfHeight + SCREEN_HEIGHT / 3 * sin(prev_point_angle), 2,
-					SSD1306_COLOR_BLACK);
-			SSD1306_DrawFilledCircle(
-					halfWidth + SCREEN_HEIGHT / 3 * cos(point_angle),
-					64 / 2 + 64 / 3 * sin(point_angle), 2, SSD1306_COLOR_WHITE);
+					halfWidth + SCREEN_HEIGHT / 3 * cos_table[point_angle],
+					64 / 2 + 64 / 3 * sin_table[point_angle], 2,
+					SSD1306_COLOR_WHITE);
 
 			if (point_angle >= 360) {
 				prev_point_angle = point_angle;
-				point_angle = 0.0;
+				point_angle = 0;
 			} else {
 				prev_point_angle = point_angle;
-				point_angle += 0.1;
+				point_angle += 8;
 			}
 
 			break;
 		case MENU:
-
 			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
-			SSD1306_Puts("Hello World", &Font_11x18, 1);
-
+			SSD1306_Puts("< Menu >", &Font_7x10, 1);
+			break;
 		case EQUALIZER:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_Puts("< Equal >", &Font_7x10, 1);
+			break;
 		case EQUALIZER_HIGH:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_Puts("< Altos >", &Font_7x10, 1);
+			break;
 		case EQUALIZER_MID:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_Puts("< Medios >", &Font_7x10, 1);
+			break;
 		case EQUALIZER_LOW:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_Puts("< Bajos >", &Font_7x10, 1);
+			break;
 		case FOLDER_SEARCH:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_Puts("< Carpetas >", &Font_7x10, 1);
+			break;
 		case FILES_SEARCH:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_Puts("< Archivos >", &Font_7x10, 1);
+			break;
 
 		default:
 			break;
@@ -400,7 +556,8 @@ void menu(void *argument) {
 
 		SSD1306_UpdateScreen();
 		osDelay(50);
-
+		// TODO: agregar toggle pin de debug
+		// HAL_GPIO_TogglePin(GPIO, GPIO_Pin)
 	}
 	/* USER CODE END menu */
 }
@@ -420,9 +577,6 @@ void handleButtonPress(void *argument) {
 	// Recupero los parámetros del botón
 	ButtonParams btnParams = *((ButtonParams*) argument);
 
-//	struct configParpadeo_t conf =
-//	*((struct configParpadeo_t*)argument);
-
 	for (;;) {
 
 		if (btnParams.type == CANCEL) {
@@ -436,6 +590,8 @@ void handleButtonPress(void *argument) {
 
 			// lógica del boton aceptar
 			if (btnParams.type == ACCEPT) {
+				lastInteractionTick = HAL_GetTick();
+
 				switch (displayParams.menu) {
 				case START:
 					displayParams.menu = MENU;
@@ -444,8 +600,16 @@ void handleButtonPress(void *argument) {
 					break;
 				}
 			} else {
+				lastInteractionTick = HAL_GetTick();
+
 				switch (displayParams.menu) {
 				case MENU:
+				case EQUALIZER:
+				case EQUALIZER_HIGH:
+				case EQUALIZER_MID:
+				case EQUALIZER_LOW:
+				case FILES_SEARCH:
+				case FOLDER_SEARCH:
 					displayParams.menu = START;
 					break;
 				default:
@@ -462,6 +626,83 @@ void handleButtonPress(void *argument) {
 		osDelay(1);
 	}
 	/* USER CODE END handleButtonPress */
+}
+
+/* USER CODE BEGIN Header_handleEncoder */
+/**
+ * @brief Function implementing the encoderTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_handleEncoder */
+void handleEncoder(void *argument) {
+	/* USER CODE BEGIN handleEncoder */
+
+	uint8_t prevState = 0;
+	uint8_t currState = 0;
+
+	const int8_t encoderStateTable[4][4] = {
+	/*00*/{ 0, -1, 1, 0 },
+	/*01*/{ 1, 0, 0, -1 },
+	/*10*/{ -1, 0, 0, 1 },
+	/*11*/{ 0, 1, -1, 0 } };
+
+	prevState = ((HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET) << 1)
+			| (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_RESET);
+
+	for (;;) {
+		currState = ((HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET)
+				<< 1) | (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_RESET);
+
+		if (currState != prevState) {
+			int8_t direction = encoderStateTable[prevState][currState];
+
+			if (direction != 0) {
+				lastInteractionTick = HAL_GetTick();
+
+				// Se gira a la derecha el encoder
+				switch (displayParams.menu) {
+				case START:
+					// prev_point_angle = point_angle;
+					// if (direction > 0) {
+					// 	point_angle += 8;
+					// 	if (point_angle >= 360)
+					// 		point_angle -= 360;
+					// } else {
+					// 	if (point_angle < 8)
+					// 		point_angle += 360;
+					// 	point_angle -= 8;
+					// }
+					break;
+				case EQUALIZER:
+				case EQUALIZER_HIGH:
+				case EQUALIZER_MID:
+				case EQUALIZER_LOW:
+				case FOLDER_SEARCH:
+					displayParams.menu += direction > 0 ? 1 : -1;
+					break;
+				case MENU:
+					displayParams.menu =
+							direction < 0 ?
+									FILES_SEARCH : displayParams.menu + 1;
+				case FILES_SEARCH:
+					displayParams.menu =
+							direction > 0 ? MENU : displayParams.menu - 1;
+					break;
+				default:
+					break;
+				}
+
+				prevState = currState;
+
+				osDelay(15);
+			}
+
+			osDelay(1);
+		}
+
+		/* USER CODE END handleEncoder */
+	}
 }
 
 /**
@@ -502,19 +743,19 @@ void Error_Handler(void) {
 	/* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
-}
+#ifdef USE_FULL_ASSERT
+	/**
+	 * @brief  Reports the name of the source file and the source line number
+	 *         where the assert_param error has occurred.
+	 * @param  file: pointer to the source file name
+	 * @param  line: assert_param error line source number
+	 * @retval None
+	 */
+	void assert_failed(uint8_t *file, uint32_t line)
+	{
+		/* USER CODE BEGIN 6 */
+		/* User can add his own implementation to report the file name and line number,
+		   ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+		/* USER CODE END 6 */
+	}
 #endif /* USE_FULL_ASSERT */
