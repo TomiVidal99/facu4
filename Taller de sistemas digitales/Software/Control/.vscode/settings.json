@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.m": "matlab",
         "delay.h": "c",
         "sleep.h": "c",
         "k_phi_r.h": "c",
@@ -10,6 +11,8 @@
         "voltage_controller.h": "c",
         "i2c_lcd.h": "c",
         "config.h": "c",
-        "motors.h": "c"
+        "motors.h": "c",
+        "noisech.h": "c",
+        "servo.h": "c"
     }
 }

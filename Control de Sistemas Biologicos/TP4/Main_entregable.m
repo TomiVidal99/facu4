@@ -30,9 +30,9 @@ simConfig.Solver = 'ode1';
 simConfig.FixedStep = num2str(timeStep);
 
 % Si se quieren generar los gráficos
-% si se quieren gráficos -> 1
+% si, se quieren gráficos -> 1
 % no, no se quieren -> 0
-shouldSavePlot = 1;
+shouldSavePlot = 0;
 
 %% Proceso sin ningún controlador (respuesta del sistema)
 % Solo para ver lo que está pasando con el sistema,

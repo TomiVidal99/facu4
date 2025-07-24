@@ -19,4 +19,9 @@
 
 ## Algunas conclusiones importantes
 La suma de los n aparatos siempre es la potencia total, no importa cual sea el punto común.
-Si se tiene un sistema con n hilos, los vatímetros están conectados 
+## Teorema de Blondel
+Si se tiene un sistema con n hilos, los vatímetros están conectados a una misma referencia (tierra o no) entonces se requieren n-1 vatímetros
+
+# Nomenclatura (IMPORTANTE)
+Pa(bc) -> a es el hilo en que se mide corriente, bc son los hilos del diferencial de potencial eléctrico
+

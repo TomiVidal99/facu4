@@ -12,6 +12,7 @@
         "i2c_lcd.h": "c",
         "config.h": "c",
         "motors.h": "c",
-        "noisech.h": "c"
+        "noisech.h": "c",
+        "servo.h": "c"
     }
 }

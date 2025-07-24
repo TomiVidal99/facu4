@@ -10,9 +10,9 @@ MCU = atmega328p
 F_CPU = 16000000UL
 
 PROGRAMMER = arduino
-CONFIG_FILE = "C:\Users\tomii\Downloads\avrdude.conf" 
+CONFIG_FILE = "D:\AVRDUDE\avrdude.conf" 
 BAUD = 57600
-AVRDUDE = "C:\Users\tomii\Downloads\avrdude.exe"
+AVRDUDE = "D:\AVRDUDE\avrdude.exe"
 COM_PORT = COM3
 
 # Source files
@@ -30,7 +30,7 @@ LDFLAGS = -mmcu=$(MCU)
 BUILD_DIR = build
 
 # Tools
-CC = "C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe"
+CC = "D:\avr8-gnu-toolchain\bin\avr-gcc.exe"
 OBJCOPY = avr-objcopy
 
 # Output file names

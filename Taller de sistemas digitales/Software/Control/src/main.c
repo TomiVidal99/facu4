@@ -25,7 +25,8 @@
 nRF24L01 *setup_rf(void);
 
 volatile bool rf_interrupt = false;
-char STATE[6] = "SSSAAA"; // example: +100180 -> velocidad 100 adelante, rotar 180 grados
+// El tamaño es 7 porque hay un caracter al final \0
+char STATE[7] = "SSSAAA"; // example: +100180 -> velocidad 100 adelante, rotar 180 grados
 
 #ifdef DEBUG
 char *sender_message = "Sender started...\n\r";
@@ -58,7 +59,10 @@ int main(void)
     uint8_t speed = adc_read(0);
     uint8_t angle = adc_read(1);
 
+#ifdef DEBUG
     sprintf(STATE, "%03d%03d", speed, angle);
+    USART_putstring(sender_message);
+#endif
 
 #ifdef DEBUG
     sprintf(sender_message, "%s\r\n", STATE);
