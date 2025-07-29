@@ -238,23 +238,6 @@ Que si se considera el caso reducido, donde el nitrógeno está en saturación y
 \mu(s) = \mu_{\text{max}} \frac{s}{K_S + s + \frac{s^2}{K_{is}}} 
 \end{equation*}
 
-Para realizar la simulación se hizo uso de simulink, a continuación se muestran los dos casos para cuando no se alimenta o se alimenta constantemente con sustrato, y el caso para cuando se alimenta exponencialmente con sustrato.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/simulink1.png}
-  \caption{Simulación para el caso de alimentación constante}
-  \label{fig:simulink1}
-\end{figure}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp1/simulink2.png}
-  \caption{Simulación para el caso de alimentación exponencial}
-  \label{fig:simulink2}
-\end{figure}
-
-Para realizar las simulaciones de los diferentes controladores y casos particulares, se hacen variaciones en el simulink, por lo que varían ligeramente de los casos presentados en previamente, pero en esencia sigue siendo el mismo modelo, prácticamente solo se cambia la acción de control.
-
 \section{Sistema sin control}  
 Se simula el sistema sin ningún control a forma de referencia.
 
@@ -272,15 +255,19 @@ Se simula el sistema sin ningún control a forma de referencia.
 Como se puede ver la biomasa tiene un comportamiento exponencial con respecto al tiempo, y el $\mu(s)$ se establece a un valor, que no es el deseado, por lo que se diseña un controlador para corregirlo.
 
 \section{Control exponencial}
-Se implementa un controlador que regula \(\mu(s)\) mediante una alimentación exponencial de sustrato, la acción de control es la dilución:
+Se implementa un controlador que regula \(\mu(s)\) (a \(\mu(s_r)=\mu_r\)) mediante una alimentación exponencial de sustrato ($F_{in}=\lambda X=\lambda xV$), el mismo se obtuvo de considerar que se anula la dinámica del sustrato, además se agregan términos proporcionales e integrales al error:
 
 \begin{equation*}
-  u(t) = D = \frac{\lambda X_0 e^{mu_{r}t}}{V}
+  \dot{s} = 0 = -k_{s1}\mu(s_r)x+\lambda x (s_{in}-s)
 \end{equation*}
 
-\begin{equation}
-D = \frac{\mu_r X_0 k_{s1} e^{\mu_r t}}{(s_{\text{in}} - s_r) V}
-\end{equation}
+\begin{equation*}
+  \lambda = \frac{k_{s1}\mu(s)}{(s_{in}-s)}
+\end{equation*}
+
+\begin{equation*}
+  u(t) = D(t) = \frac{F_{in}}{V} = \frac{k_{s1}\mu(s_r)x}{(s_{in}-s)}
+\end{equation*}
 
 \begin{figure}[H]
   \centering
@@ -292,16 +279,7 @@ D = \frac{\mu_r X_0 k_{s1} e^{\mu_r t}}{(s_{\text{in}} - s_r) V}
   \includegraphics[width=0.43\textwidth]{./Images_tp3/exp_err.png}
   \caption{Error control con alimentación exponencial}
 \end{figure}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp3/exp_x0.png}
-  \caption{Control con alimentación exponencial (se varía $x_{0}$)}
-\end{figure}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.43\textwidth]{./Images_tp3/exp_err_x0.png}
-  \caption{Error control con alimentación exponencial (se varía $x_{0}$)}
-\end{figure}
+
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.43\textwidth]{./Images_tp3/exp_ks1.png}
@@ -312,6 +290,11 @@ D = \frac{\mu_r X_0 k_{s1} e^{\mu_r t}}{(s_{\text{in}} - s_r) V}
   \includegraphics[width=0.43\textwidth]{./Images_tp3/exp_err_ks1.png}
   \caption{Error control con alimentación exponencial (se varía $k_{s1}$)}
 \end{figure}
+
+Como se puede observar, ahora con el lazo cerrado de realimentación exponencial logra hacer que $\mu(s)$ converga a $\mu_r$, pero al variar los parámetros del modelo se producen errores de convergencia. Para lo cual se agrega un término que es integrativo del error:
+\begin{equation*}
+  u(t) = D(t) = \frac{k_{s1}\mu(s_r)x+k_p(\mu(s)-\mu(s_r))}{(s_{in}-s)}
+\end{equation*}
 
 \begin{itemize}  
     \item \(\mu(s)\) converge a un valor distinto al deseado (\(\mu_r(s)\)), con error inicial alto y dinámica lenta.  
