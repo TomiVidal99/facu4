@@ -85,6 +85,9 @@ savePlot(shouldSavePlot, fig, 'sin_control_mu')
 
 DatosModeloTP4
 
+sim_hours = 50;
+simConfig.StopTime = num2str(sim_hours);
+
 s_r=0.27; % s de referencia a operar
 mu_r=0.0845; % mu de referencia a operar
 
@@ -149,66 +152,66 @@ savePlot(shouldSavePlot, fig, 'exp_err')
 
 %% Alimentación exponencial: variación en el parámetro x0 en 20%
 
-DatosModeloTP4
-
-modelParameters.s_in=s_in;
-modelParameters.x0=x0;
-modelParameters.s_r = 0.1259;
-modelParameters.v0=v0;
-modelParameters.mu_r=mu_r;
-
-params={x0*(1.2),x0*(0.8)}; % más/menos 20% del x0
-mus=cell(length(params));
-error=cell(length(params));
-MSE=cell(length(params));
-for i=1:length(params)
-
-    modelParameters.x0=params{i};
-
-    sim_out = sim('simulaciones/TP4_control_exp', simConfig);
-
-    time = sim_out.tout;
-    volume = sim_out.volume.Data;
-    states = sim_out.states.Data;
-    biomass = reshape(states(:,1), size(time));
-    sustrates = reshape(states(:,2), size(time)).*volume;
-    Do = sim_out.Do.Data;
-    mus{i} = sim_out.mu_s.Data;
-
-    mu_r_vector = ones(1, length(mus{i}))*mu_r;
- 
-    error{i}=(mu_r_vector-mus{i});
-    MSE{i} = immse(reshape(mu_r_vector, size(mus{i})), mus{i});
-end
-
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('\mu(s) (Alimentación exponencial) (x0±20%)');
-xlabel('Tiempo [Horas]');
-ylabel('\mu(s)');
-plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
-plot(time, mus{1}, 'LineWidth', 2);
-plot(time, mus{2}, 'LineWidth', 2);
-
-legend('Referencia' ...
-    ,sprintf('x0=%.1f', params{1}), ...
-    sprintf('x0=%.1f', params{2}));
-savePlot(shouldSavePlot, fig, 'exp_x0')
-
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('Error relativo del \mu(s) (x0±20%)');
-xlabel('Tiempo [Horas]');
-ylabel('Error relativo [%]');
-ylim([0 100])
-plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
-plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
-
-legend(sprintf('x0=%.1f (MSE=%.4f)', params{1}, MSE{1}), ...
-    sprintf('x0=%.1f (MSE=%.4f)', params{2}, MSE{2}));
-savePlot(shouldSavePlot, fig, 'exp_err_x0')
+% DatosModeloTP4
+% 
+% modelParameters.s_in=s_in;
+% modelParameters.x0=x0;
+% modelParameters.s_r = 0.1259;
+% modelParameters.v0=v0;
+% modelParameters.mu_r=mu_r;
+% 
+% params={x0*(1.2),x0*(0.8)}; % más/menos 20% del x0
+% mus=cell(length(params));
+% error=cell(length(params));
+% MSE=cell(length(params));
+% for i=1:length(params)
+% 
+%     modelParameters.x0=params{i};
+% 
+%     sim_out = sim('simulaciones/TP4_control_exp', simConfig);
+% 
+%     time = sim_out.tout;
+%     volume = sim_out.volume.Data;
+%     states = sim_out.states.Data;
+%     biomass = reshape(states(:,1), size(time));
+%     sustrates = reshape(states(:,2), size(time)).*volume;
+%     Do = sim_out.Do.Data;
+%     mus{i} = sim_out.mu_s.Data;
+% 
+%     mu_r_vector = ones(1, length(mus{i}))*mu_r;
+% 
+%     error{i}=(mu_r_vector-mus{i});
+%     MSE{i} = immse(reshape(mu_r_vector, size(mus{i})), mus{i});
+% end
+% 
+% fig = figure();
+% set(fig,'Position',[0 0 800 600]);
+% hold on; grid on;
+% title('\mu(s) (Alimentación exponencial) (x0±20%)');
+% xlabel('Tiempo [Horas]');
+% ylabel('\mu(s)');
+% plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
+% plot(time, mus{1}, 'LineWidth', 2);
+% plot(time, mus{2}, 'LineWidth', 2);
+% 
+% legend('Referencia' ...
+%     ,sprintf('x0=%.1f', params{1}), ...
+%     sprintf('x0=%.1f', params{2}));
+% savePlot(shouldSavePlot, fig, 'exp_x0')
+% 
+% fig = figure();
+% set(fig,'Position',[0 0 800 600]);
+% hold on; grid on;
+% title('Error relativo del \mu(s) (x0±20%)');
+% xlabel('Tiempo [Horas]');
+% ylabel('Error relativo [%]');
+% ylim([0 100])
+% plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
+% plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
+% 
+% legend(sprintf('x0=%.1f (MSE=%.4f)', params{1}, MSE{1}), ...
+%     sprintf('x0=%.1f (MSE=%.4f)', params{2}, MSE{2}));
+% savePlot(shouldSavePlot, fig, 'exp_err_x0')
 
 %% Alimentación exponencial: variación en el parámetro ks1 en 20%
 
@@ -280,8 +283,8 @@ savePlot(shouldSavePlot, fig, 'exp_err_ks1')
 
 DatosModeloTP4
 
-sim_hours2 = 90;
-timeStep2 = 0.8*1e-2;
+sim_hours2 = 40;
+timeStep2 = 1e-2;
 simConfig.StopTime = num2str(sim_hours2);
 simConfig.FixedStep = num2str(timeStep2);
 
@@ -291,7 +294,7 @@ modelParameters.s_r = 0.1259;
 modelParameters.mu_r=mu_r;
 % modelParameters.kp=0.1; % factor proporcional
 
-params={15, 20, 30, 50};
+params={1,2,3,4};
 mus=cell(length(params));
 error=cell(length(params));
 MSE=cell(length(params));
@@ -321,11 +324,11 @@ hold on; grid on;
 title('\mu(s) (Control exponencial con ganancia Kp)');
 xlabel('Tiempo [Horas]');
 ylabel('\mu(s)');
-plot(sustrate, mu_r_vector, 'k--', 'LineWidth', 2);
-plot(sustrate, mus{1}, 'LineWidth', 2);
-plot(sustrate, mus{2}, 'LineWidth', 2);
-plot(sustrate, mus{3}, 'LineWidth', 2);
-plot(sustrate, mus{4}, 'LineWidth', 2);
+plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
+plot(time, mus{1}, 'LineWidth', 2);
+plot(time, mus{2}, 'LineWidth', 2);
+plot(time, mus{3}, 'LineWidth', 2);
+plot(time, mus{4}, 'LineWidth', 2);
 
 legend('Referencia' ...
     ,sprintf('kp=%.1f', params{1}), ...
@@ -341,7 +344,7 @@ hold on; grid on;
 title('Error relativo del \mu(s)');
 xlabel('Tiempo [Horas]');
 ylabel('Error relativo [%]');
-ylim([0 100])
+ylim([0 200])
 plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
 plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
 plot(time, getRelativeError(abs(error{3}), mu_r_vector), 'LineWidth', 3);
@@ -431,71 +434,71 @@ savePlot(shouldSavePlot, fig, 'exp_err_ki')
 
 %% Alimentación exponencial: robustez (x0), sólo para kp+ki
 % Se verifica el robustez haciendo una variación del parámetros x0
-
-DatosModeloTP4
-
-modelParameters.s_in=s_in;
-modelParameters.x0=x0;
-modelParameters.s_r = 0.1259;
-modelParameters.mu_r=mu_r;
-modelParameters.kp=30; % factor proporcional
-modelParameters.ki=30; % factor integrativo
-e0=mu_r*1.5;
-
-params_x0={x0*(1.2),x0*(0.8)}; % más/menos 20% del x0
-mus=cell(length(params_x0));
-error=cell(length(params_x0));
-MSE=cell(length(params_x0));
-for i=1:length(params_x0)
-    modelParameters.x0=params_x0{i};
-
-    sim_out = sim('simulaciones/TP4_control_int', simConfig);
-
-    time = sim_out.tout;
-    volume = sim_out.volume.Data;
-    states = sim_out.states.Data;
-    biomass = reshape(states(:,1), size(time));
-    sustrate = reshape(states(:,2), size(time)).*volume;
-    Do = sim_out.Do.Data;
-    mus{i} = sim_out.mu_s.Data;
-
-    mu_r_vector = ones(1, length(mus{i}))*mu_r;
-    
-    error{i}=(mu_r_vector-mus{i});
-    MSE{i} = immse(reshape(mu_r_vector, size(mus{i})), mus{i});
-
-end
-
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('\mu(s) (Control exponencial con integrador) (x0±20%)');
-xlabel('Tiempo [Horas]');
-ylabel('\mu(s)');
-plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
-plot(time, mus{1}, 'LineWidth', 2);
-plot(time, mus{2}, 'LineWidth', 2);
-
-legend('Referencia' ...
-    ,sprintf('x0=%.1f', params_x0{1}), ...
-    sprintf('x0=%.1f', params_x0{2}));
-savePlot(shouldSavePlot, fig, 'exp_rob_x0')
-
-
-% Error relativo
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('Error relativo del \mu(s) (x0±20%)');
-xlabel('Tiempo [Horas]');
-ylabel('Error relativo [%]');
-ylim([0 100])
-plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
-plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
-
-legend(sprintf('x0=%.1f (MSE=%.4f)', params_x0{1}, MSE{1}), ...
-    sprintf('x0=%.1f (MSE=%.4f)', params_x0{2}, MSE{2}));
-savePlot(shouldSavePlot, fig, 'exp_rob_err_x0')
+% 
+% DatosModeloTP4
+% 
+% modelParameters.s_in=s_in;
+% modelParameters.x0=x0;
+% modelParameters.s_r = 0.1259;
+% modelParameters.mu_r=mu_r;
+% modelParameters.kp=30; % factor proporcional
+% modelParameters.ki=30; % factor integrativo
+% e0=mu_r*1.5;
+% 
+% params_x0={x0*(1.2),x0*(0.8)}; % más/menos 20% del x0
+% mus=cell(length(params_x0));
+% error=cell(length(params_x0));
+% MSE=cell(length(params_x0));
+% for i=1:length(params_x0)
+%     modelParameters.x0=params_x0{i};
+% 
+%     sim_out = sim('simulaciones/TP4_control_int', simConfig);
+% 
+%     time = sim_out.tout;
+%     volume = sim_out.volume.Data;
+%     states = sim_out.states.Data;
+%     biomass = reshape(states(:,1), size(time));
+%     sustrate = reshape(states(:,2), size(time)).*volume;
+%     Do = sim_out.Do.Data;
+%     mus{i} = sim_out.mu_s.Data;
+% 
+%     mu_r_vector = ones(1, length(mus{i}))*mu_r;
+% 
+%     error{i}=(mu_r_vector-mus{i});
+%     MSE{i} = immse(reshape(mu_r_vector, size(mus{i})), mus{i});
+% 
+% end
+% 
+% fig = figure();
+% set(fig,'Position',[0 0 800 600]);
+% hold on; grid on;
+% title('\mu(s) (Control exponencial con integrador) (x0±20%)');
+% xlabel('Tiempo [Horas]');
+% ylabel('\mu(s)');
+% plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
+% plot(time, mus{1}, 'LineWidth', 2);
+% plot(time, mus{2}, 'LineWidth', 2);
+% 
+% legend('Referencia' ...
+%     ,sprintf('x0=%.1f', params_x0{1}), ...
+%     sprintf('x0=%.1f', params_x0{2}));
+% savePlot(shouldSavePlot, fig, 'exp_rob_x0')
+% 
+% 
+% % Error relativo
+% fig = figure();
+% set(fig,'Position',[0 0 800 600]);
+% hold on; grid on;
+% title('Error relativo del \mu(s) (x0±20%)');
+% xlabel('Tiempo [Horas]');
+% ylabel('Error relativo [%]');
+% ylim([0 100])
+% plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
+% plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
+% 
+% legend(sprintf('x0=%.1f (MSE=%.4f)', params_x0{1}, MSE{1}), ...
+%     sprintf('x0=%.1f (MSE=%.4f)', params_x0{2}, MSE{2}));
+% savePlot(shouldSavePlot, fig, 'exp_rob_err_x0')
 
 
 %% Alimentación exponencial: robustez (ks1), sólo para kp+ki
