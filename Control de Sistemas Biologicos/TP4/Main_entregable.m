@@ -32,12 +32,15 @@ simConfig.FixedStep = num2str(timeStep);
 % Si se quieren generar los gráficos
 % si, se quieren gráficos -> 1
 % no, no se quieren -> 0
-shouldSavePlot = 0;
+shouldSavePlot = 1;
 
 %% Proceso sin ningún controlador (respuesta del sistema)
 % Solo para ver lo que está pasando con el sistema,
 % antes de empezar a controlar nada
 DatosModeloTP4
+
+sim_hours = 50; % la cantidad de horas que se van a simular
+simConfig.StopTime = num2str(sim_hours);
 
 D=0.1;
 params={1};
@@ -85,7 +88,7 @@ savePlot(shouldSavePlot, fig, 'sin_control_mu')
 
 DatosModeloTP4
 
-sim_hours = 50;
+sim_hours = 10;
 simConfig.StopTime = num2str(sim_hours);
 
 s_r=0.27; % s de referencia a operar
@@ -148,70 +151,6 @@ plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
 
 legend(sprintf('(Sr=%.3f,mur=%.3f) (MSE=%.4f)', MSE{1}, params{1}(1), params{1}(2)));
 savePlot(shouldSavePlot, fig, 'exp_err')
-
-
-%% Alimentación exponencial: variación en el parámetro x0 en 20%
-
-% DatosModeloTP4
-% 
-% modelParameters.s_in=s_in;
-% modelParameters.x0=x0;
-% modelParameters.s_r = 0.1259;
-% modelParameters.v0=v0;
-% modelParameters.mu_r=mu_r;
-% 
-% params={x0*(1.2),x0*(0.8)}; % más/menos 20% del x0
-% mus=cell(length(params));
-% error=cell(length(params));
-% MSE=cell(length(params));
-% for i=1:length(params)
-% 
-%     modelParameters.x0=params{i};
-% 
-%     sim_out = sim('simulaciones/TP4_control_exp', simConfig);
-% 
-%     time = sim_out.tout;
-%     volume = sim_out.volume.Data;
-%     states = sim_out.states.Data;
-%     biomass = reshape(states(:,1), size(time));
-%     sustrates = reshape(states(:,2), size(time)).*volume;
-%     Do = sim_out.Do.Data;
-%     mus{i} = sim_out.mu_s.Data;
-% 
-%     mu_r_vector = ones(1, length(mus{i}))*mu_r;
-% 
-%     error{i}=(mu_r_vector-mus{i});
-%     MSE{i} = immse(reshape(mu_r_vector, size(mus{i})), mus{i});
-% end
-% 
-% fig = figure();
-% set(fig,'Position',[0 0 800 600]);
-% hold on; grid on;
-% title('\mu(s) (Alimentación exponencial) (x0±20%)');
-% xlabel('Tiempo [Horas]');
-% ylabel('\mu(s)');
-% plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
-% plot(time, mus{1}, 'LineWidth', 2);
-% plot(time, mus{2}, 'LineWidth', 2);
-% 
-% legend('Referencia' ...
-%     ,sprintf('x0=%.1f', params{1}), ...
-%     sprintf('x0=%.1f', params{2}));
-% savePlot(shouldSavePlot, fig, 'exp_x0')
-% 
-% fig = figure();
-% set(fig,'Position',[0 0 800 600]);
-% hold on; grid on;
-% title('Error relativo del \mu(s) (x0±20%)');
-% xlabel('Tiempo [Horas]');
-% ylabel('Error relativo [%]');
-% ylim([0 100])
-% plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
-% plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
-% 
-% legend(sprintf('x0=%.1f (MSE=%.4f)', params{1}, MSE{1}), ...
-%     sprintf('x0=%.1f (MSE=%.4f)', params{2}, MSE{2}));
-% savePlot(shouldSavePlot, fig, 'exp_err_x0')
 
 %% Alimentación exponencial: variación en el parámetro ks1 en 20%
 
@@ -283,10 +222,8 @@ savePlot(shouldSavePlot, fig, 'exp_err_ks1')
 
 DatosModeloTP4
 
-sim_hours2 = 40;
-timeStep2 = 1e-2;
+sim_hours2 = 30;
 simConfig.StopTime = num2str(sim_hours2);
-simConfig.FixedStep = num2str(timeStep2);
 
 modelParameters.s_in=s_in;
 modelParameters.x0=x0;
@@ -294,7 +231,7 @@ modelParameters.s_r = 0.1259;
 modelParameters.mu_r=mu_r;
 % modelParameters.kp=0.1; % factor proporcional
 
-params={1,2,3,4};
+params={1,2,3,6};
 mus=cell(length(params));
 error=cell(length(params));
 MSE=cell(length(params));
@@ -344,7 +281,7 @@ hold on; grid on;
 title('Error relativo del \mu(s)');
 xlabel('Tiempo [Horas]');
 ylabel('Error relativo [%]');
-ylim([0 200])
+ylim([0 100])
 plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
 plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
 plot(time, getRelativeError(abs(error{3}), mu_r_vector), 'LineWidth', 3);
@@ -361,6 +298,9 @@ savePlot(shouldSavePlot, fig, 'exp_err_kp')
 % Se prueban diferentes ganancias de ki
 
 DatosModeloTP4
+
+sim_hours2 = 6;
+simConfig.StopTime = num2str(sim_hours2);
 
 modelParameters.s_in=s_in;
 modelParameters.x0=x0;

@@ -255,7 +255,7 @@ Se simula el sistema sin ningún control a forma de referencia.
 Como se puede ver la biomasa tiene un comportamiento exponencial con respecto al tiempo, y el $\mu(s)$ se establece a un valor, que no es el deseado, por lo que se diseña un controlador para corregirlo.
 
 \section{Control exponencial}
-Se implementa un controlador que regula \(\mu(s)\) (a \(\mu(s_r)=\mu_r\)) mediante una alimentación exponencial de sustrato ($F_{in}=\lambda X=\lambda xV$), el mismo se obtuvo de considerar que se anula la dinámica del sustrato, además se agregan términos proporcionales e integrales al error:
+Se implementa un controlador que regula \(\mu(s)\) (a \(\mu(s_r)=\mu_r\)) mediante una alimentación exponencial de sustrato ($F_{in}=\lambda X=\lambda xV$), el mismo se obtuvo de considerar que se anula la dinámica del sustrato:
 
 \begin{equation*}
   \dot{s} = 0 = -k_{s1}\mu(s_r)x+\lambda x (s_{in}-s)
@@ -280,6 +280,8 @@ Se implementa un controlador que regula \(\mu(s)\) (a \(\mu(s_r)=\mu_r\)) median
   \caption{Error control con alimentación exponencial}
 \end{figure}
 
+Aunque si se varían los valores del parámetro $k_{s1}$ en un $20\%$ se puede observar que no se llega al valor deseado
+
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.43\textwidth]{./Images_tp3/exp_ks1.png}
@@ -291,21 +293,11 @@ Se implementa un controlador que regula \(\mu(s)\) (a \(\mu(s_r)=\mu_r\)) median
   \caption{Error control con alimentación exponencial (se varía $k_{s1}$)}
 \end{figure}
 
-Como se puede observar, ahora con el lazo cerrado de realimentación exponencial logra hacer que $\mu(s)$ converga a $\mu_r$, pero al variar los parámetros del modelo se producen errores de convergencia. Para lo cual se agrega un término que es integrativo del error:
-\begin{equation*}
-  u(t) = D(t) = \frac{k_{s1}\mu(s_r)x+k_p(\mu(s)-\mu(s_r))}{(s_{in}-s)}
-\end{equation*}
-
-\begin{itemize}  
-    \item \(\mu(s)\) converge a un valor distinto al deseado (\(\mu_r(s)\)), con error inicial alto y dinámica lenta.  
-    \item \textit{Robustez}: Al variar \(x_0\) y \(k_{s1}\) en \(\pm 20\%\), el error cambia significativamente, indicando baja robustez.  
-\end{itemize}  
-
 \subsection{Controlador con acción proporcional (P)}  
-Al control anterior se le agrega un término proporcional (\(k_p\)) al error:
+Para solucionar el problema de robustez, al control anterior se le agrega un término proporcional (\(k_p\)) al error:
 
 \begin{equation}
-D = \frac{\mu_r X_0 k_{s1} e^{\mu_r t}}{(s_{\text{in}} - s_r) V} + \frac{k_p (\mu_r - \mu_s)}{(s_{\text{in}} - s_r)}
+D = \frac{k_{s1}\mu(s_r)x+k_p(\mu_r-\mu(s))}{s_{in}-s_r}
 \end{equation}
 
 \begin{figure}[H]
