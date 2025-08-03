@@ -32,7 +32,7 @@ simConfig.FixedStep = num2str(timeStep);
 % Si se quieren generar los gráficos
 % si, se quieren gráficos -> 1
 % no, no se quieren -> 0
-shouldSavePlot = 1;
+shouldSavePlot = 0;
 
 %% Proceso sin ningún controlador (respuesta del sistema)
 % Solo para ver lo que está pasando con el sistema,
@@ -88,7 +88,7 @@ savePlot(shouldSavePlot, fig, 'sin_control_mu')
 
 DatosModeloTP4
 
-sim_hours = 10;
+sim_hours = 8;
 simConfig.StopTime = num2str(sim_hours);
 
 s_r=0.27; % s de referencia a operar
@@ -222,7 +222,7 @@ savePlot(shouldSavePlot, fig, 'exp_err_ks1')
 
 DatosModeloTP4
 
-sim_hours2 = 30;
+sim_hours2 = 8;
 simConfig.StopTime = num2str(sim_hours2);
 
 modelParameters.s_in=s_in;
@@ -293,13 +293,82 @@ legend(sprintf('kp=%.1f (MSE=%.4f)', params{1}, MSE{1}), ...
     sprintf('kp=%.1f (MSE=%.4f)', params{4}, MSE{4}));
 savePlot(shouldSavePlot, fig, 'exp_err_kp')
 
+%% Control exponencial con términos kp (variación del ks1)
+% Se varía ks1 en un 20% para ver cómo de robusto es el controlador
+% con término proporcional al error
+
+DatosModeloTP4
+
+sim_hours2 = 8;
+simConfig.StopTime = num2str(sim_hours2);
+
+modelParameters.s_in=s_in;
+modelParameters.x0=x0;
+modelParameters.s_r = 0.1259;
+modelParameters.mu_r=mu_r;
+% modelParameters.kp=0.1; % factor proporcional
+
+params={ks1*0.8, ks1*1.2};
+mus=cell(length(params));
+error=cell(length(params));
+MSE=cell(length(params));
+for i=1:length(params)
+    modelParameters.kp=params{i};
+
+    sim_out = sim('simulaciones/TP4_control_kp', simConfig);
+
+    time = sim_out.tout;
+    volume = sim_out.volume.Data;
+    states = sim_out.states.Data;
+    biomass = reshape(states(:,1), size(time));
+    sustrate = reshape(states(:,2), size(time)).*volume;
+    Do = sim_out.Do.Data;
+    mus{i} = sim_out.mu_s.Data;
+
+    mu_r_vector = ones(1, length(mus{i}))*mu_r;
+    
+    error{i}=(mu_r_vector-mus{i});
+    MSE{i} = immse(reshape(mu_r_vector, size(mus{i})), mus{i});
+
+end
+
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('\mu(s) Control exponencial (Kp) (ks1±20%)');
+xlabel('Tiempo [Horas]');
+ylabel('\mu(s)');
+plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
+plot(time, mus{1}, 'LineWidth', 2);
+plot(time, mus{2}, 'LineWidth', 2);
+
+legend('Referencia' ...
+    ,sprintf('kp=%.1f', params{1}), ...
+    sprintf('kp=%.1f', params{2}));
+savePlot(shouldSavePlot, fig, 'exp_kp_ks1')
+
+% Error relativo
+fig = figure();
+set(fig,'Position',[0 0 800 600]);
+hold on; grid on;
+title('Error relativo del \mu(s) (ks1±20%)');
+xlabel('Tiempo [Horas]');
+ylabel('Error relativo [%]');
+ylim([0 100])
+plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
+plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
+
+legend(sprintf('ks1=%.2f (MSE=%.4f)', params{1}, MSE{1}), ...
+    sprintf('ks1=%.2f (MSE=%.4f)', params{2}, MSE{2}));
+savePlot(shouldSavePlot, fig, 'exp_err_kp_ks1');
+
 %% Control exponencial con términos  kp y ki
 % Ahora también se agrega otro término que es integrativo del error
 % Se prueban diferentes ganancias de ki
 
 DatosModeloTP4
 
-sim_hours2 = 6;
+sim_hours2 = 20;
 simConfig.StopTime = num2str(sim_hours2);
 
 modelParameters.s_in=s_in;
@@ -371,75 +440,6 @@ legend(sprintf('ki=%.1f (MSE=%.4f)', params{1}, MSE{1}), ...
     sprintf('ki=%.1f (MSE=%.4f)', params{3}, MSE{3}), ...
     sprintf('ki=%.1f (MSE=%.4f)', params{4}, MSE{4}));
 savePlot(shouldSavePlot, fig, 'exp_err_ki')
-
-%% Alimentación exponencial: robustez (x0), sólo para kp+ki
-% Se verifica el robustez haciendo una variación del parámetros x0
-% 
-% DatosModeloTP4
-% 
-% modelParameters.s_in=s_in;
-% modelParameters.x0=x0;
-% modelParameters.s_r = 0.1259;
-% modelParameters.mu_r=mu_r;
-% modelParameters.kp=30; % factor proporcional
-% modelParameters.ki=30; % factor integrativo
-% e0=mu_r*1.5;
-% 
-% params_x0={x0*(1.2),x0*(0.8)}; % más/menos 20% del x0
-% mus=cell(length(params_x0));
-% error=cell(length(params_x0));
-% MSE=cell(length(params_x0));
-% for i=1:length(params_x0)
-%     modelParameters.x0=params_x0{i};
-% 
-%     sim_out = sim('simulaciones/TP4_control_int', simConfig);
-% 
-%     time = sim_out.tout;
-%     volume = sim_out.volume.Data;
-%     states = sim_out.states.Data;
-%     biomass = reshape(states(:,1), size(time));
-%     sustrate = reshape(states(:,2), size(time)).*volume;
-%     Do = sim_out.Do.Data;
-%     mus{i} = sim_out.mu_s.Data;
-% 
-%     mu_r_vector = ones(1, length(mus{i}))*mu_r;
-% 
-%     error{i}=(mu_r_vector-mus{i});
-%     MSE{i} = immse(reshape(mu_r_vector, size(mus{i})), mus{i});
-% 
-% end
-% 
-% fig = figure();
-% set(fig,'Position',[0 0 800 600]);
-% hold on; grid on;
-% title('\mu(s) (Control exponencial con integrador) (x0±20%)');
-% xlabel('Tiempo [Horas]');
-% ylabel('\mu(s)');
-% plot(time, mu_r_vector, 'k--', 'LineWidth', 2);
-% plot(time, mus{1}, 'LineWidth', 2);
-% plot(time, mus{2}, 'LineWidth', 2);
-% 
-% legend('Referencia' ...
-%     ,sprintf('x0=%.1f', params_x0{1}), ...
-%     sprintf('x0=%.1f', params_x0{2}));
-% savePlot(shouldSavePlot, fig, 'exp_rob_x0')
-% 
-% 
-% % Error relativo
-% fig = figure();
-% set(fig,'Position',[0 0 800 600]);
-% hold on; grid on;
-% title('Error relativo del \mu(s) (x0±20%)');
-% xlabel('Tiempo [Horas]');
-% ylabel('Error relativo [%]');
-% ylim([0 100])
-% plot(time, getRelativeError(abs(error{1}), mu_r_vector), 'LineWidth', 3);
-% plot(time, getRelativeError(abs(error{2}), mu_r_vector), 'LineWidth', 3);
-% 
-% legend(sprintf('x0=%.1f (MSE=%.4f)', params_x0{1}, MSE{1}), ...
-%     sprintf('x0=%.1f (MSE=%.4f)', params_x0{2}, MSE{2}));
-% savePlot(shouldSavePlot, fig, 'exp_rob_err_x0')
-
 
 %% Alimentación exponencial: robustez (ks1), sólo para kp+ki
 % Se verifica el robustez haciendo una variación del parámetros ks1
@@ -515,8 +515,8 @@ savePlot(shouldSavePlot, fig, 'exp_rob_err_ks1')
 DatosModeloTP4
 
 % Parámetros de la perturbación
-disturbanceParameters.start = 20;
-disturbanceParameters.end = 30;
+disturbanceParameters.start = 12;
+disturbanceParameters.end = 15;
 disturbanceParameters.percentage = 0.2;
 
 modelParameters.s_in=s_in;
@@ -582,6 +582,9 @@ savePlot(shouldSavePlot, fig, 'exp_rech_err')
 %% Control linealizante
 % Se diseña un control que elimina la dinámica del sustrato
 
+sim_hours2 = 1;
+simConfig.StopTime = num2str(sim_hours2);
+
 DatosModeloTP4
 
 % referencia del sustrato (s*)
@@ -591,12 +594,14 @@ modelParameters.s_in=s_in;
 modelParameters.s_r = s_r;
 modelParameters.mu_r=mu_r;
 
-params={1};
+params={3, 5, 10, 15};
 sustrates=cell(length(params));
 biomass=cell(length(params));
 error=cell(length(params));
 MSE=cell(length(params));
 for i=1:length(params)
+
+    modelParameters.lambda=params{i};
 
     sim_out = sim('simulaciones/TP4_control_linealizante', simConfig);
 
@@ -623,8 +628,15 @@ xlabel('Tiempo [Horas]');
 ylabel('Concentración [g/g]');
 plot(time, sustrate_vector_r, 'k--', 'LineWidth', 2);
 plot(time, sustrates{1}, 'LineWidth', 2);
+plot(time, sustrates{2}, 'LineWidth', 2);
+plot(time, sustrates{3}, 'LineWidth', 2);
+plot(time, sustrates{4}, 'LineWidth', 2);
 
-legend('Referencia', 'Sustrato');
+legend('Referencia' ...
+    ,sprintf('lambda=%.1f', params{1}), ...
+    sprintf('lambda=%.1f', params{2}), ...
+    sprintf('lambda=%.1f', params{3}), ...
+    sprintf('lambda=%.1f', params{4}));
 savePlot(shouldSavePlot, fig, 'lin')
 
 % Error relativo
@@ -634,16 +646,25 @@ hold on; grid on;
 title('Error relativo');
 xlabel('Tiempo [Horas]');
 ylabel('Error relativo [%]');
-% ylim([0 100])
+ylim([0 100])
 plot(time, getRelativeError(abs(error{1}), sustrate_vector_r), 'LineWidth', 3);
+plot(time, getRelativeError(abs(error{2}), sustrate_vector_r), 'LineWidth', 3);
+plot(time, getRelativeError(abs(error{3}), sustrate_vector_r), 'LineWidth', 3);
+plot(time, getRelativeError(abs(error{4}), sustrate_vector_r), 'LineWidth', 3);
 
-legend(sprintf('(MSE=%.4f)', params{1}, MSE{1}));
+legend(sprintf('lambda=%.1f (MSE=%.4f)', params{1}, MSE{1}), ...
+    sprintf('lambda=%.1f (MSE=%.4f)', params{2}, MSE{2}), ...
+     sprintf('lambda=%.1f (MSE=%.4f)', params{3}, MSE{3}), ...
+      sprintf('lambda=%.1f (MSE=%.4f)', params{4}, MSE{4}));
 savePlot(shouldSavePlot, fig, 'lin_err')
 
 %% Control linealizante: variaciones en ks1
 % Se varía ks1 para el control linealizante
 
 DatosModeloTP4
+
+sim_hours2 = 0.8;
+simConfig.StopTime = num2str(sim_hours2);
 
 % referencia del sustrato (s*)
 s_r=0.15; 
@@ -652,6 +673,8 @@ modelParameters.s_in=s_in;
 modelParameters.x0=x0;
 modelParameters.s_r = s_r;
 modelParameters.mu_r=mu_r;
+
+modelParameters.lambda=15;
 
 params={ks1*(0.8), ks1*(1.2)};
 sustrates=cell(length(params));
@@ -708,81 +731,13 @@ legend(sprintf('ks1=%.2f (MSE=%.4f)', params{1}, MSE{1}), ...
     sprintf('ks1=%.2f (MSE=%.4f)', params{2}, MSE{2}));
 savePlot(shouldSavePlot, fig, 'lin_err_ks1')
 
-%% Control linealizante: kp
-% Al control linealizante se le agrega un término que es proporcional
-% al error (sr-s)
+%% Control linealizante: variaciones en Ks
+% Se varía Ks para el control linealizante
 
 DatosModeloTP4
 
-% referencia del sustrato (s*)
-s_r=0.15; 
-
-modelParameters.s_in=s_in;
-modelParameters.s_r = s_r;
-modelParameters.mu_r=mu_r;
-
-params={1, 5, 10};
-sustrates=cell(length(params));
-error=cell(length(params));
-MSE=cell(length(params));
-for i=1:length(params)
-    modelParameters.kp=params{i};
-
-    sim_out = sim('simulaciones/TP4_control_linealizante_kp', simConfig);
-
-    time = sim_out.tout;
-    volume = sim_out.volume.Data;
-    states = sim_out.states.Data;
-    biomass = reshape(states(:,1), size(time));
-    sustrates{i} = reshape(states(:,2), size(time));
-    Do = sim_out.Do.Data;
-    mu = sim_out.mu_s.Data;
-
-    sustrate_vector_r = ones(length(sustrates{i}), 1)*s_r;
-    
-    error{i}=(sustrate_vector_r-sustrates{i});
-    MSE{i} = immse(reshape(sustrate_vector_r, size(sustrates{i})), sustrates{i});
-
-end
-
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('Control linealizante del sustrato (kp)');
-xlabel('Tiempo [Horas]');
-ylabel('Concentración [g/g]');
-plot(time, sustrate_vector_r, 'k--', 'LineWidth', 2);
-plot(time, sustrates{1}, 'LineWidth', 2);
-plot(time, sustrates{2}, 'LineWidth', 2);
-plot(time, sustrates{3}, 'LineWidth', 2);
-
-legend('Referencia', ...
-    sprintf('Kp=%.1f', params{1}), ...
-    sprintf('Kp=%.1f', params{2}), ...
-    sprintf('Kp=%.1f', params{3}));
-savePlot(shouldSavePlot, fig, 'lin_kp')
-
-% Error relativo
-fig = figure();
-set(fig,'Position',[0 0 800 600]);
-hold on; grid on;
-title('Error relativo');
-xlabel('Tiempo [Horas]');
-ylabel('Error relativo [%]');
-ylim([0 100])
-plot(time, getRelativeError(abs(error{1}), sustrate_vector_r), 'LineWidth', 3);
-plot(time, getRelativeError(abs(error{2}), sustrate_vector_r), 'LineWidth', 3);
-plot(time, getRelativeError(abs(error{3}), sustrate_vector_r), 'LineWidth', 3);
-
-legend(sprintf('Ki=%.1f (MSE=%.4f)', params{1}, MSE{1}), ...
-    sprintf('Ki=%.1f (MSE=%.4f)', params{2}, MSE{2}),...
-    sprintf('Ki=%.1f (MSE=%.4f)', params{3}, MSE{3}));
-savePlot(shouldSavePlot, fig, 'lin_kp_err')
-
-%% Control linealizante: kp, variaciones en ks1
-% Se varía ks1 para el control linealizante con ganancia kp
-
-DatosModeloTP4
+sim_hours2 = 0.8;
+simConfig.StopTime = num2str(sim_hours2);
 
 % referencia del sustrato (s*)
 s_r=0.15; 
@@ -792,15 +747,18 @@ modelParameters.x0=x0;
 modelParameters.s_r = s_r;
 modelParameters.mu_r=mu_r;
 
-params={ks1*(0.8), ks1*(1.2)};
+modelParameters.lambda=15;
+
+params={(0.8)*Ks, (1.2)*Ks};
 sustrates=cell(length(params));
 biomass=cell(length(params));
 error=cell(length(params));
 MSE=cell(length(params));
 for i=1:length(params)
-    modelParameters.ks1 = params{i};
+    
+    modelParameters.mu_model.Ks=params{i};
 
-    sim_out = sim('simulaciones/TP4_control_linealizante_kp', simConfig);
+    sim_out = sim('simulaciones/TP4_control_linealizante', simConfig);
 
     time = sim_out.tout;
     volume = sim_out.volume.Data;
@@ -820,7 +778,7 @@ end
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Control linealizante (kp) del sustrato (ks1±20%)');
+title('Control linealizante del sustrato (Ks±20%)');
 xlabel('Tiempo [Horas]');
 ylabel('Concentración [g/g]');
 plot(time, sustrate_vector_r, 'k--', 'LineWidth', 2);
@@ -828,30 +786,32 @@ plot(time, sustrates{1}, 'LineWidth', 2);
 plot(time, sustrates{2}, 'LineWidth', 2);
 
 legend('Referencia', ...
-    sprintf('ks1=%.3f', params{1}), ...
-    sprintf('ks1=%.3f', params{2}));
-savePlot(shouldSavePlot, fig, 'lin_kp_ks1')
+    sprintf('Ks=%.3f', params{1}), ...
+    sprintf('Ks=%.3f', params{2}));
+savePlot(shouldSavePlot, fig, 'lin_Ks')
 
 % Error relativo
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Error relativo (ks1±20%)');
+title('Error relativo (Ks±20%)');
 xlabel('Tiempo [Horas]');
 ylabel('Error relativo [%]');
 ylim([0 100])
 plot(time, getRelativeError(abs(error{1}), sustrate_vector_r), 'LineWidth', 3);
 plot(time, getRelativeError(abs(error{2}), sustrate_vector_r), 'LineWidth', 3);
 
-legend(sprintf('ks1=%.2f (MSE=%.4f)', params{1}, MSE{1}), ...
-    sprintf('ks1=%.2f (MSE=%.4f)', params{2}, MSE{2}));
-savePlot(shouldSavePlot, fig, 'lin_kp_err_ks1')
+legend(sprintf('Ks=%.2f (MSE=%.4f)', params{1}, MSE{1}), ...
+    sprintf('Ks=%.2f (MSE=%.4f)', params{2}, MSE{2}));
+savePlot(shouldSavePlot, fig, 'lin_err_Ks')
 
-%% Control linealizante: kp+ki
-% Ahora se prueba un control proporcional integrativo del error
-% y se varía ks1
+%% Control linealizante: variaciones en Kis
+% Se varía Kis para el control linealizante
 
 DatosModeloTP4
+
+sim_hours2 = 0.8;
+simConfig.StopTime = num2str(sim_hours2);
 
 % referencia del sustrato (s*)
 s_r=0.15; 
@@ -860,19 +820,19 @@ modelParameters.s_in=s_in;
 modelParameters.x0=x0;
 modelParameters.s_r = s_r;
 modelParameters.mu_r=mu_r;
-modelParameters.kp=30; % factor proporcional
-modelParameters.ki=30;
-e0=1.5*s_r;
 
-params={ks1*(0.8), ks1*(1.2)};
+modelParameters.lambda=15;
+
+params={(0.8)*Kis, (1.2)*Kis};
 sustrates=cell(length(params));
 biomass=cell(length(params));
 error=cell(length(params));
 MSE=cell(length(params));
 for i=1:length(params)
-    modelParameters.ks1 = params{i};
+    
+    modelParameters.mu_model.Kis=params{i};
 
-    sim_out = sim('simulaciones/TP4_control_linealizante_ki', simConfig);
+    sim_out = sim('simulaciones/TP4_control_linealizante', simConfig);
 
     time = sim_out.tout;
     volume = sim_out.volume.Data;
@@ -892,7 +852,7 @@ end
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Control linealizante (kp y ki) del sustrato (ks1±20%)');
+title('Control linealizante del sustrato (Kis±20%)');
 xlabel('Tiempo [Horas]');
 ylabel('Concentración [g/g]');
 plot(time, sustrate_vector_r, 'k--', 'LineWidth', 2);
@@ -900,30 +860,35 @@ plot(time, sustrates{1}, 'LineWidth', 2);
 plot(time, sustrates{2}, 'LineWidth', 2);
 
 legend('Referencia', ...
-    sprintf('ks1=%.3f', params{1}), ...
-    sprintf('ks1=%.3f', params{2}));
-savePlot(shouldSavePlot, fig, 'lin_ki')
+    sprintf('Kis=%.3f', params{1}), ...
+    sprintf('Kis=%.3f', params{2}));
+savePlot(shouldSavePlot, fig, 'lin_Kis')
 
 % Error relativo
 fig = figure();
 set(fig,'Position',[0 0 800 600]);
 hold on; grid on;
-title('Error relativo (ks1±20%)');
+title('Error relativo (Kis±20%)');
 xlabel('Tiempo [Horas]');
 ylabel('Error relativo [%]');
 ylim([0 100])
 plot(time, getRelativeError(abs(error{1}), sustrate_vector_r), 'LineWidth', 3);
 plot(time, getRelativeError(abs(error{2}), sustrate_vector_r), 'LineWidth', 3);
 
-legend(sprintf('ks1=%.2f (MSE=%.4f)', params{1}, MSE{1}), ...
-    sprintf('ks1=%.2f (MSE=%.4f)', params{2}, MSE{2}));
-savePlot(shouldSavePlot, fig, 'lin_ki_err')
+legend(sprintf('Kis=%.2f (MSE=%.4f)', params{1}, MSE{1}), ...
+    sprintf('Kis=%.2f (MSE=%.4f)', params{2}, MSE{2}));
+savePlot(shouldSavePlot, fig, 'lin_err_Kis')
 
 %% Control adaptivo
 % Se implementa un control adaptivo considerando
 % como que no se conoce mu(s)
 
 DatosModeloTP4
+
+sim_hours2 = 1.5;
+simConfig.StopTime = num2str(sim_hours2);
+
+modelParameters.lambda=15;
 
 mu_est0=1.5*mu_r;
 
@@ -932,7 +897,7 @@ modelParameters.x0=x0;
 modelParameters.s_r = s_r;
 modelParameters.mu_r=mu_r;
 
-params={1, 2, 3};
+params={5, 10, 20};
 sustrates=cell(length(params));
 biomass=cell(length(params));
 error=cell(length(params));
@@ -994,6 +959,12 @@ savePlot(shouldSavePlot, fig, 'ad_err')
 %% Adaptivo: variaciones de ks1
 
 DatosModeloTP4
+
+sim_hours2 = 8;
+simConfig.StopTime = num2str(sim_hours2);
+
+modelParameters.lambda=20;
+modelParameters.gamma1=30;
 
 mu_est0=1.5*mu_r;
 
@@ -1063,6 +1034,12 @@ savePlot(shouldSavePlot, fig, 'ad_err_ks1')
 
 DatosModeloTP4
 
+sim_hours2 = 1;
+simConfig.StopTime = num2str(sim_hours2);
+
+modelParameters.lambda=20;
+modelParameters.gamma1=30;
+
 mu_est0=1.5*mu_r;
 
 modelParameters.s_in=s_in;
@@ -1071,8 +1048,8 @@ modelParameters.s_r = s_r;
 modelParameters.mu_r=mu_r;
 
 % Parámetros de la perturbación
-disturbanceParameters.start = 20;
-disturbanceParameters.end = 30;
+disturbanceParameters.start = 0.7;
+disturbanceParameters.end = 0.8;
 disturbanceParameters.percentage = 0.2;
 
 params={0};
@@ -1131,6 +1108,12 @@ savePlot(shouldSavePlot, fig, 'ad_err_D')
 % completo
 
 DatosModeloTP4
+
+sim_hours2 = 15;
+simConfig.StopTime = num2str(sim_hours2);
+
+modelParameters.lambda=20;
+modelParameters.gamma1=30;
 
 states0 = [x0;s0;0;0]*1.5;
 

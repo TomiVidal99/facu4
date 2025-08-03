@@ -13,7 +13,7 @@ function e = getRelativeError(absoluteError, realValue)
             e(i) = 1;
         elseif (realValue(i) < 1e-3) && (absoluteError(i) > 1e-2)
             e(i) = 100;
-         elseif (realValue(i) > 1e-2) && (absoluteError(i) < 1e-3)
+         elseif (realValue(i) > 1e-2) && (absoluteError(i) < 1e-6)
             e(i) = 0;
         else
             e(i) = 100*absoluteError(i)/realValue(i);
