@@ -133,7 +133,7 @@
       table(
         columns: (auto, auto),
         align: (center, center),
-        [*Capacidad (uF)*], [*FP*],
+        [*Capacidad [uF]*], [*FP*],
         [1100], [0.677],
         [770], [0.782],
         [1430], [0.72],
@@ -214,7 +214,7 @@
       table(
         columns: (auto, auto),
         align: (center, center),
-        [*Resistencia (#sym.Omega)*], [*Tensión media (V)*],
+        [*Resistencia [#sym.Omega]*], [*Tensión media [V]*],
         [100], [3.9163],
         [1k], [7.878],
         [10k], [9.1312],
@@ -223,5 +223,62 @@
       placement: top,
     )
   ]
+
+  = Problema 4
+  Se hicieron varios circuitos para poder resolver el problema dado. El uno de los circuitos es con diodos "reales" (tiene alinealidades), otro con diodos "ideales" (sin alinealidades) y otro donde se iteran valores del valor efectivo de la fuente para ver cuando se cumple el error de las alinealidades menor al 5%.
+
+  Con los datos provistos para el problema, se puede calcular la resistencia multiplicadora que resulta en R_m=4451.58#sym.Omega aproximadamente. Con esta resistencia R_m en serie a los 50#sym.Omega se puede verificar en la simulación que la corriente máxima no se alcanza, satisfaciendo las condiciones requeridas.
+
+  #figure(
+    image("Imagenes/4-circuito_base.png", width: 100%),
+    caption: [Circuito con diodos ideales],
+  )
+  #figure(
+    image("Imagenes/4-circ_diodos_ideales.png", width: 100%),
+    caption: [Circuito con diodos ideales],
+  )
+
+  #align(center)[
+    #figure(
+      table(
+        columns: (auto, auto, auto),
+        align: (center, center, center),
+        [], [*Diodos "reales"*], [*Diodos "ideales"*],
+        [*Corriente ($#sym.mu A$)*], [761.67], [994.08],
+      ),
+      caption: [Corrientes en la resistencia de $50#sym.Omega$],
+      placement: top,
+    )
+  ]
+
+  Como se puede observar en la tabla anterior la no linealidad hace que se reduzca la corriente, pero el cálculo de la resistencia es correcto, ya que cuando se emplean los diodos _ideales_, la corriente es prácticamente *1mA* ($994.08#sym.mu A$).
+
+  Luego se iteraron valores de tensión eficaz en la entrada, considerando que la sinusoide tiene V$sqrt(2)$ (donde V es en Volts eficaces), y se midió la tensión eficaz a la salida, y haciendo el cálculo del error ($e=frac(V_"entrada"-V_"salida", V_"entrada")$), en la siguiene tabla se observan los resultados.
+
+  #figure(
+    image("Imagenes/4-circ_iteraciones.png", width: 100%),
+    caption: [Circuito empleado para calcular mínimo error de alinealidad],
+  )
+
+  #align(center)[
+    #figure(
+      table(
+        columns: (auto, auto, auto),
+        align: (center, center, center),
+        [*Entrada [$V_text("ef")$]*], [*Salida [$V_text("ef")$]*], [*Error [%]*],
+        [19.8821], [18.7225], [5.8328],
+        [21.8714], [20.7019], [5.4725],
+        [23.8546], [22.6796], [4.9952],
+        [25.8482], [24.6165], [4.5906],
+        [27.8358], [26.6415], [4.2898],
+        [29.8243], [28.6234], [4.0268],
+        [31.8105], [30.6029], [3.7961],
+      ),
+      caption: [Error debido a la alinealidad de los diodos variando la tensión de entrada],
+      placement: top,
+    )
+  ]
+
+  Por lo que se concluye que para una entrada mayor a $23.84V_text("ef")$ se tiene un error menor al 5% que era lo que se buscaba.
 
 ]
