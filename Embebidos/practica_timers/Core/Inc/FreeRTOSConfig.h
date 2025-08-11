@@ -59,7 +59,7 @@
 #define configSUPPORT_STATIC_ALLOCATION          1
 #define configSUPPORT_DYNAMIC_ALLOCATION         1
 #define configUSE_IDLE_HOOK                      0
-#define configUSE_TICK_HOOK                      0
+#define configUSE_TICK_HOOK                      1
 #define configCPU_CLOCK_HZ                       ( SystemCoreClock )
 #define configTICK_RATE_HZ                       ((TickType_t)1000)
 #define configMAX_PRIORITIES                     ( 56 )
@@ -71,6 +71,7 @@
 #define configUSE_MUTEXES                        1
 #define configQUEUE_REGISTRY_SIZE                8
 #define configUSE_RECURSIVE_MUTEXES              1
+#define configUSE_APPLICATION_TASK_TAG           1
 #define configUSE_COUNTING_SEMAPHORES            1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION  0
 
@@ -137,7 +138,13 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
 /* USER CODE BEGIN 1 */
-#define configASSERT( x ) if ((x) == 0) {taskDISABLE_INTERRUPTS(); for( ;; );}
+#define configASSERT(x)       \
+  if ((x) == 0)               \
+  {                           \
+    taskDISABLE_INTERRUPTS(); \
+    for (;;)                  \
+      ;                       \
+  }
 /* USER CODE END 1 */
 
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
@@ -151,6 +158,14 @@ standard names. */
 
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
+#include "main.h"
+void callback(int, Bool);
+#define traceTASK_SWITCHED_IN() callback((int)pxCurrentTCB->pxTaskTag, TRUE)
+#define traceTASK_SWITCHED_OUT() callback((int)pxCurrentTCB->pxTaskTag, FALSE)
+#define PLAYER_TASK_TAG 0
+#define MENU_TASK_TAG 1
+#define ENCONDER_TASK_TAG 2
+#define DEFAULT_TASK_TAG 3
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

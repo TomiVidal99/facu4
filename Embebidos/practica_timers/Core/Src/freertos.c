@@ -52,6 +52,24 @@
 
 /* USER CODE END FunctionPrototypes */
 
+/* Hook prototypes */
+void vApplicationTickHook(void);
+
+/* USER CODE BEGIN 3 */
+void vApplicationTickHook( void )
+{
+   /* This function will be called by each tick interrupt if
+   configUSE_TICK_HOOK is set to 1 in FreeRTOSConfig.h. User code can be
+   added here, but the tick hook is called from an interrupt context, so
+   code must not attempt to block, and only the interrupt safe FreeRTOS API
+   functions can be used (those that end in FromISR()). */
+
+    // Pulse a GPIO pin (e.g., PA8)
+    GPIOA->BSRR = GPIO_BSRR_BS8;  // Set pin
+    GPIOA->BSRR = GPIO_BSRR_BR8; // Reset pin
+}
+/* USER CODE END 3 */
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 

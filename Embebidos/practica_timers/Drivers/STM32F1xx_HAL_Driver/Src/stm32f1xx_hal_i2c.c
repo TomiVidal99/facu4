@@ -513,6 +513,7 @@ HAL_StatusTypeDef HAL_I2C_Init(I2C_HandleTypeDef *hi2c)
 #endif /* USE_HAL_I2C_REGISTER_CALLBACKS */
   }
 
+
   hi2c->State = HAL_I2C_STATE_BUSY;
 
   /* Disable the selected I2C peripheral */

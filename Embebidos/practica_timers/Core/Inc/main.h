@@ -76,7 +76,9 @@ extern "C" {
 
   typedef struct {
   	Bool isPlaying;
-
+    char filename[32];
+    int bufIndex;
+    Bool shouldLoadBuffer;
   } AudioPlayerOptions;
 /* USER CODE END ET */
 
@@ -100,16 +102,32 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define DEBUG_ERROR_HANDLER_Pin GPIO_PIN_13
+#define DEBUG_ERROR_HANDLER_GPIO_Port GPIOC
 #define ENCODER_A_Pin GPIO_PIN_14
 #define ENCODER_A_GPIO_Port GPIOC
 #define ENCODER_B_Pin GPIO_PIN_15
 #define ENCODER_B_GPIO_Port GPIOC
+#define AUDIO_PWM_OUTPUT_Pin GPIO_PIN_0
+#define AUDIO_PWM_OUTPUT_GPIO_Port GPIOA
 #define BTN_BACK_Pin GPIO_PIN_2
 #define BTN_BACK_GPIO_Port GPIOA
 #define BTN_ENTER_Pin GPIO_PIN_3
 #define BTN_ENTER_GPIO_Port GPIOA
 #define SD_CS_Pin GPIO_PIN_1
 #define SD_CS_GPIO_Port GPIOB
+#define DEBUG_ERROR_HANDLERB10_Pin GPIO_PIN_10
+#define DEBUG_ERROR_HANDLERB10_GPIO_Port GPIOB
+#define DEBUG_SCHEDULER_TICK_Pin GPIO_PIN_8
+#define DEBUG_SCHEDULER_TICK_GPIO_Port GPIOA
+#define DEBUG_TASK_DEFAULT_Pin GPIO_PIN_9
+#define DEBUG_TASK_DEFAULT_GPIO_Port GPIOA
+#define DEBUG_TASK_ENCODER_Pin GPIO_PIN_10
+#define DEBUG_TASK_ENCODER_GPIO_Port GPIOA
+#define DEBUG_TASK_PLAYER_Pin GPIO_PIN_11
+#define DEBUG_TASK_PLAYER_GPIO_Port GPIOA
+#define DEBUG_TASK_MENU_Pin GPIO_PIN_12
+#define DEBUG_TASK_MENU_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

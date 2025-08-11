@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "ff_gen_drv.h": "c"
+        "ff_gen_drv.h": "c",
+        "task.h": "c"
     }
 }
