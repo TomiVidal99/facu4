@@ -27,7 +27,9 @@
 #include "ssd1306.h"
 #include "user_diskio_spi.h"
 #include "task.h"
-#include "musica.h"
+// #include "musica.h"
+#include "error_messages.h"
+#include "fft.h"
 
 /* USER CODE END Includes */
 
@@ -39,7 +41,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SCREEN_WIDTH 128
+#define SCREEN_WIDTH_1_4 (SCREEN_WIDTH / 4)
+#define SCREEN_WIDTH_2_4 (SCREEN_WIDTH * 2 / 4)
+#define SCREEN_WIDTH_3_4 (SCREEN_WIDTH * 3 / 4)
 #define SCREEN_HEIGHT 64
+#define SCREEN_HEIGHT_2 (SCREEN_HEIGHT / 2)
 #define TEXT_X_OFFSET 10
 
 // definiciones para el encoder
@@ -54,10 +60,11 @@
 
 // cosas para debugear
 // se puede elegir que es lo que se prubea para aislar los errores
-// #define DEBUG_WATERMARK // Debug para ver el tamaño del stack de cada tarea
+#define DEBUG_WATERMARK // Debug para ver el tamaño del stack de cada tarea
 #define ACTIVATE_DEBUG_PIN() (HAL_GPIO_TogglePin(DEBUG_ERROR_HANDLERB10_GPIO_Port, DEBUG_ERROR_HANDLERB10_Pin))
-#define DEBUG_SD
-#define AUDIO_BUFFER_SIZE 1024
+// #define DEBUG_SD
+#define DEBUG_TASKS
+#define AUDIO_BUFFER_SIZE 32
 // #define DEBUG_SCREEN
 
 #define SCREEN_SAVER_TIMEOUT 5000
@@ -79,63 +86,80 @@ TIM_HandleTypeDef htim3;
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
-	.name = "defaultTask",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityNormal,
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for menuTask */
 osThreadId_t menuTaskHandle;
 const osThreadAttr_t menuTask_attributes = {
-	.name = "menuTask",
-	.stack_size = 256 * 4,
-	.priority = (osPriority_t)osPriorityNormal,
+  .name = "menuTask",
+  .stack_size = 170 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal7,
 };
 /* Definitions for acceptButtonTas */
 osThreadId_t acceptButtonTasHandle;
 const osThreadAttr_t acceptButtonTas_attributes = {
-	.name = "acceptButtonTas",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityHigh,
+  .name = "acceptButtonTas",
+  .stack_size = 300 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for cancelButtonTas */
 osThreadId_t cancelButtonTasHandle;
 const osThreadAttr_t cancelButtonTas_attributes = {
-	.name = "cancelButtonTas",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityHigh,
+  .name = "cancelButtonTas",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for encoderTask */
 osThreadId_t encoderTaskHandle;
 const osThreadAttr_t encoderTask_attributes = {
-	.name = "encoderTask",
-	.stack_size = 128 * 4,
-	.priority = (osPriority_t)osPriorityHigh,
+  .name = "encoderTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for musicPlayer */
 osThreadId_t musicPlayerHandle;
 const osThreadAttr_t musicPlayer_attributes = {
-	.name = "musicPlayer",
-	.stack_size = 384 * 4,
-	.priority = (osPriority_t)osPriorityLow,
+  .name = "musicPlayer",
+  .stack_size = 200 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for transformTask */
+osThreadId_t transformTaskHandle;
+const osThreadAttr_t transformTask_attributes = {
+  .name = "transformTask",
+  .stack_size = 400 * 4,
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for menuMutex */
 osMutexId_t menuMutexHandle;
 const osMutexAttr_t menuMutex_attributes = {
-	.name = "menuMutex"};
+  .name = "menuMutex"
+};
 /* Definitions for playerMutex */
 osMutexId_t playerMutexHandle;
 const osMutexAttr_t playerMutex_attributes = {
-	.name = "playerMutex"};
+  .name = "playerMutex"
+};
+/* Definitions for fftMutex */
+osMutexId_t fftMutexHandle;
+const osMutexAttr_t fftMutex_attributes = {
+  .name = "fftMutex"
+};
 /* USER CODE BEGIN PV */
 
-static DisplayParams displayParams = {.menu = START};
+static DisplayParams displayParams = {.menu = START, .errorMessage = ""};
+// static DisplayParams displayParams = {.menu = ERROR_STATE, .errorMessage = "TEST ERROR"};
 static AudioPlayerOptions audioPlayerOpts = {
-	.isPlaying = TRUE,
-	.filename =
-		"test.wav",
+	.isReadingMusicFile = FALSE,
+	.isPlaying = FALSE,
+	.filename = "test.wav",
 	.bufIndex = 0,
-	.shouldLoadBuffer = TRUE,
+	.shouldLoadBuffer = FALSE,
+	.currentPath = "/",
 };
+static FileBrowser fileBrowser = {0};
 
 const ButtonParams acceptButtonParams = {.type = ACCEPT, .port = GPIOA, .pin = GPIO_PIN_3};
 const ButtonParams cancelButtonParams = {.type = CANCEL, .port = GPIOA, .pin = GPIO_PIN_2};
@@ -149,123 +173,133 @@ FATFS FatFs;
 FIL fil;
 FRESULT fres;
 UINT bytesRead;
-BYTE mp3Buf[AUDIO_BUFFER_SIZE];
+BYTE wavBuffer[AUDIO_BUFFER_SIZE];
+struct cmpx wavBufferFFT[64];
+
+// Testing
+volatile size_t freeHeap;
+UBaseType_t uxHighWaterMark_TASK1;
+UBaseType_t uxHighWaterMark_TASK2;
+UBaseType_t uxHighWaterMark_TASK3;
+UBaseType_t uxHighWaterMark_TASK4;
+UBaseType_t uxHighWaterMark_TASK5;
+UBaseType_t uxHighWaterMark_TASK6;
 
 // Para no usar 'math.h' uso una tabla de valores
-const float sin_table[361] = {0.00000f, 0.03490f, 0.06976f, 0.10453f, 0.13917f,
-							  0.17365f, 0.20791f, 0.24192f, 0.27564f, 0.30902f, 0.34202f, 0.37461f,
-							  0.40674f, 0.43837f, 0.46947f, 0.50000f, 0.52992f, 0.55919f, 0.58779f,
-							  0.61566f, 0.64279f, 0.66913f, 0.69466f, 0.71934f, 0.74314f, 0.76604f,
-							  0.78801f, 0.80902f, 0.82904f, 0.84805f, 0.86603f, 0.88295f, 0.89879f,
-							  0.91355f, 0.92718f, 0.93969f, 0.95106f, 0.96126f, 0.97030f, 0.97815f,
-							  0.98481f, 0.99027f, 0.99452f, 0.99756f, 0.99939f, 1.00000f, 0.99939f,
-							  0.99756f, 0.99452f, 0.99027f, 0.98481f, 0.97815f, 0.97030f, 0.96126f,
-							  0.95106f, 0.93969f, 0.92718f, 0.91355f, 0.89879f, 0.88295f, 0.86603f,
-							  0.84805f, 0.82904f, 0.80902f, 0.78801f, 0.76604f, 0.74314f, 0.71934f,
-							  0.69466f, 0.66913f, 0.64279f, 0.61566f, 0.58779f, 0.55919f, 0.52992f,
-							  0.50000f, 0.46947f, 0.43837f, 0.40674f, 0.37461f, 0.34202f, 0.30902f,
-							  0.27564f, 0.24192f, 0.20791f, 0.17365f, 0.13917f, 0.10453f, 0.06976f,
-							  0.03490f, 0.00000f, -0.03490f, -0.06976f, -0.10453f, -0.13917f,
-							  -0.17365f, -0.20791f, -0.24192f, -0.27564f, -0.30902f, -0.34202f,
-							  -0.37461f, -0.40674f, -0.43837f, -0.46947f, -0.50000f, -0.52992f,
-							  -0.55919f, -0.58779f, -0.61566f, -0.64279f, -0.66913f, -0.69466f,
-							  -0.71934f, -0.74314f, -0.76604f, -0.78801f, -0.80902f, -0.82904f,
-							  -0.84805f, -0.86603f, -0.88295f, -0.89879f, -0.91355f, -0.92718f,
-							  -0.93969f, -0.95106f, -0.96126f, -0.97030f, -0.97815f, -0.98481f,
-							  -0.99027f, -0.99452f, -0.99756f, -0.99939f, -1.00000f, -0.99939f,
-							  -0.99756f, -0.99452f, -0.99027f, -0.98481f, -0.97815f, -0.97030f,
-							  -0.96126f, -0.95106f, -0.93969f, -0.92718f, -0.91355f, -0.89879f,
-							  -0.88295f, -0.86603f, -0.84805f, -0.82904f, -0.80902f, -0.78801f,
-							  -0.76604f, -0.74314f, -0.71934f, -0.69466f, -0.66913f, -0.64279f,
-							  -0.61566f, -0.58779f, -0.55919f, -0.52992f, -0.50000f, -0.46947f,
-							  -0.43837f, -0.40674f, -0.37461f, -0.34202f, -0.30902f, -0.27564f,
-							  -0.24192f, -0.20791f, -0.17365f, -0.13917f, -0.10453f, -0.06976f,
-							  -0.03490f, -0.00000f, 0.03490f, 0.06976f, 0.10453f, 0.13917f, 0.17365f,
-							  0.20791f, 0.24192f, 0.27564f, 0.30902f, 0.34202f, 0.37461f, 0.40674f,
-							  0.43837f, 0.46947f, 0.50000f, 0.52992f, 0.55919f, 0.58779f, 0.61566f,
-							  0.64279f, 0.66913f, 0.69466f, 0.71934f, 0.74314f, 0.76604f, 0.78801f,
-							  0.80902f, 0.82904f, 0.84805f, 0.86603f, 0.88295f, 0.89879f, 0.91355f,
-							  0.92718f, 0.93969f, 0.95106f, 0.96126f, 0.97030f, 0.97815f, 0.98481f,
-							  0.99027f, 0.99452f, 0.99756f, 0.99939f, 1.00000f, 0.99939f, 0.99756f,
-							  0.99452f, 0.99027f, 0.98481f, 0.97815f, 0.97030f, 0.96126f, 0.95106f,
-							  0.93969f, 0.92718f, 0.91355f, 0.89879f, 0.88295f, 0.86603f, 0.84805f,
-							  0.82904f, 0.80902f, 0.78801f, 0.76604f, 0.74314f, 0.71934f, 0.69466f,
-							  0.66913f, 0.64279f, 0.61566f, 0.58779f, 0.55919f, 0.52992f, 0.50000f,
-							  0.46947f, 0.43837f, 0.40674f, 0.37461f, 0.34202f, 0.30902f, 0.27564f,
-							  0.24192f, 0.20791f, 0.17365f, 0.13917f, 0.10453f, 0.06976f, 0.03490f,
-							  0.00000f, -0.03490f, -0.06976f, -0.10453f, -0.13917f, -0.17365f,
-							  -0.20791f, -0.24192f, -0.27564f, -0.30902f, -0.34202f, -0.37461f,
-							  -0.40674f, -0.43837f, -0.46947f, -0.50000f, -0.52992f, -0.55919f,
-							  -0.58779f, -0.61566f, -0.64279f, -0.66913f, -0.69466f, -0.71934f,
-							  -0.74314f, -0.76604f, -0.78801f, -0.80902f, -0.82904f, -0.84805f,
-							  -0.86603f, -0.88295f, -0.89879f, -0.91355f, -0.92718f, -0.93969f,
-							  -0.95106f, -0.96126f, -0.97030f, -0.97815f, -0.98481f, -0.99027f,
-							  -0.99452f, -0.99756f, -0.99939f, -1.00000f, -0.99939f, -0.99756f,
-							  -0.99452f, -0.99027f, -0.98481f, -0.97815f, -0.97030f, -0.96126f,
-							  -0.95106f, -0.93969f, -0.92718f, -0.91355f, -0.89879f, -0.88295f,
-							  -0.86603f, -0.84805f, -0.82904f, -0.80902f, -0.78801f, -0.76604f,
-							  -0.74314f, -0.71934f, -0.69466f, -0.66913f, -0.64279f, -0.61566f,
-							  -0.58779f, -0.55919f, -0.52992f, -0.50000f, -0.46947f, -0.43837f,
-							  -0.40674f, -0.37461f, -0.34202f, -0.30902f, -0.27564f, -0.24192f,
-							  -0.20791f, -0.17365f, -0.13917f, -0.10453f, -0.06976f, -0.00000f};
+// const float sin_table[361] = {0.00000f, 0.03490f, 0.06976f, 0.10453f, 0.13917f,
+// 							  0.17365f, 0.20791f, 0.24192f, 0.27564f, 0.30902f, 0.34202f, 0.37461f,
+// 							  0.40674f, 0.43837f, 0.46947f, 0.50000f, 0.52992f, 0.55919f, 0.58779f,
+// 							  0.61566f, 0.64279f, 0.66913f, 0.69466f, 0.71934f, 0.74314f, 0.76604f,
+// 							  0.78801f, 0.80902f, 0.82904f, 0.84805f, 0.86603f, 0.88295f, 0.89879f,
+// 							  0.91355f, 0.92718f, 0.93969f, 0.95106f, 0.96126f, 0.97030f, 0.97815f,
+// 							  0.98481f, 0.99027f, 0.99452f, 0.99756f, 0.99939f, 1.00000f, 0.99939f,
+// 							  0.99756f, 0.99452f, 0.99027f, 0.98481f, 0.97815f, 0.97030f, 0.96126f,
+// 							  0.95106f, 0.93969f, 0.92718f, 0.91355f, 0.89879f, 0.88295f, 0.86603f,
+// 							  0.84805f, 0.82904f, 0.80902f, 0.78801f, 0.76604f, 0.74314f, 0.71934f,
+// 							  0.69466f, 0.66913f, 0.64279f, 0.61566f, 0.58779f, 0.55919f, 0.52992f,
+// 							  0.50000f, 0.46947f, 0.43837f, 0.40674f, 0.37461f, 0.34202f, 0.30902f,
+// 							  0.27564f, 0.24192f, 0.20791f, 0.17365f, 0.13917f, 0.10453f, 0.06976f,
+// 							  0.03490f, 0.00000f, -0.03490f, -0.06976f, -0.10453f, -0.13917f,
+// 							  -0.17365f, -0.20791f, -0.24192f, -0.27564f, -0.30902f, -0.34202f,
+// 							  -0.37461f, -0.40674f, -0.43837f, -0.46947f, -0.50000f, -0.52992f,
+// 							  -0.55919f, -0.58779f, -0.61566f, -0.64279f, -0.66913f, -0.69466f,
+// 							  -0.71934f, -0.74314f, -0.76604f, -0.78801f, -0.80902f, -0.82904f,
+// 							  -0.84805f, -0.86603f, -0.88295f, -0.89879f, -0.91355f, -0.92718f,
+// 							  -0.93969f, -0.95106f, -0.96126f, -0.97030f, -0.97815f, -0.98481f,
+// 							  -0.99027f, -0.99452f, -0.99756f, -0.99939f, -1.00000f, -0.99939f,
+// 							  -0.99756f, -0.99452f, -0.99027f, -0.98481f, -0.97815f, -0.97030f,
+// 							  -0.96126f, -0.95106f, -0.93969f, -0.92718f, -0.91355f, -0.89879f,
+// 							  -0.88295f, -0.86603f, -0.84805f, -0.82904f, -0.80902f, -0.78801f,
+// 							  -0.76604f, -0.74314f, -0.71934f, -0.69466f, -0.66913f, -0.64279f,
+// 							  -0.61566f, -0.58779f, -0.55919f, -0.52992f, -0.50000f, -0.46947f,
+// 							  -0.43837f, -0.40674f, -0.37461f, -0.34202f, -0.30902f, -0.27564f,
+// 							  -0.24192f, -0.20791f, -0.17365f, -0.13917f, -0.10453f, -0.06976f,
+// 							  -0.03490f, -0.00000f, 0.03490f, 0.06976f, 0.10453f, 0.13917f, 0.17365f,
+// 							  0.20791f, 0.24192f, 0.27564f, 0.30902f, 0.34202f, 0.37461f, 0.40674f,
+// 							  0.43837f, 0.46947f, 0.50000f, 0.52992f, 0.55919f, 0.58779f, 0.61566f,
+// 							  0.64279f, 0.66913f, 0.69466f, 0.71934f, 0.74314f, 0.76604f, 0.78801f,
+// 							  0.80902f, 0.82904f, 0.84805f, 0.86603f, 0.88295f, 0.89879f, 0.91355f,
+// 							  0.92718f, 0.93969f, 0.95106f, 0.96126f, 0.97030f, 0.97815f, 0.98481f,
+// 							  0.99027f, 0.99452f, 0.99756f, 0.99939f, 1.00000f, 0.99939f, 0.99756f,
+// 							  0.99452f, 0.99027f, 0.98481f, 0.97815f, 0.97030f, 0.96126f, 0.95106f,
+// 							  0.93969f, 0.92718f, 0.91355f, 0.89879f, 0.88295f, 0.86603f, 0.84805f,
+// 							  0.82904f, 0.80902f, 0.78801f, 0.76604f, 0.74314f, 0.71934f, 0.69466f,
+// 							  0.66913f, 0.64279f, 0.61566f, 0.58779f, 0.55919f, 0.52992f, 0.50000f,
+// 							  0.46947f, 0.43837f, 0.40674f, 0.37461f, 0.34202f, 0.30902f, 0.27564f,
+// 							  0.24192f, 0.20791f, 0.17365f, 0.13917f, 0.10453f, 0.06976f, 0.03490f,
+// 							  0.00000f, -0.03490f, -0.06976f, -0.10453f, -0.13917f, -0.17365f,
+// 							  -0.20791f, -0.24192f, -0.27564f, -0.30902f, -0.34202f, -0.37461f,
+// 							  -0.40674f, -0.43837f, -0.46947f, -0.50000f, -0.52992f, -0.55919f,
+// 							  -0.58779f, -0.61566f, -0.64279f, -0.66913f, -0.69466f, -0.71934f,
+// 							  -0.74314f, -0.76604f, -0.78801f, -0.80902f, -0.82904f, -0.84805f,
+// 							  -0.86603f, -0.88295f, -0.89879f, -0.91355f, -0.92718f, -0.93969f,
+// 							  -0.95106f, -0.96126f, -0.97030f, -0.97815f, -0.98481f, -0.99027f,
+// 							  -0.99452f, -0.99756f, -0.99939f, -1.00000f, -0.99939f, -0.99756f,
+// 							  -0.99452f, -0.99027f, -0.98481f, -0.97815f, -0.97030f, -0.96126f,
+// 							  -0.95106f, -0.93969f, -0.92718f, -0.91355f, -0.89879f, -0.88295f,
+// 							  -0.86603f, -0.84805f, -0.82904f, -0.80902f, -0.78801f, -0.76604f,
+// 							  -0.74314f, -0.71934f, -0.69466f, -0.66913f, -0.64279f, -0.61566f,
+// 							  -0.58779f, -0.55919f, -0.52992f, -0.50000f, -0.46947f, -0.43837f,
+// 							  -0.40674f, -0.37461f, -0.34202f, -0.30902f, -0.27564f, -0.24192f,
+// 							  -0.20791f, -0.17365f, -0.13917f, -0.10453f, -0.06976f, -0.00000f};
 
-const float cos_table[361] = {1.00000f, 0.99939f, 0.99756f, 0.99452f, 0.99027f,
-							  0.98481f, 0.97815f, 0.97030f, 0.96126f, 0.95106f, 0.93969f, 0.92718f,
-							  0.91355f, 0.89879f, 0.88295f, 0.86603f, 0.84805f, 0.82904f, 0.80902f,
-							  0.78801f, 0.76604f, 0.74314f, 0.71934f, 0.69466f, 0.66913f, 0.64279f,
-							  0.61566f, 0.58779f, 0.55919f, 0.52992f, 0.50000f, 0.46947f, 0.43837f,
-							  0.40674f, 0.37461f, 0.34202f, 0.30902f, 0.27564f, 0.24192f, 0.20791f,
-							  0.17365f, 0.13917f, 0.10453f, 0.06976f, 0.03490f, 0.00000f, -0.03490f,
-							  -0.06976f, -0.10453f, -0.13917f, -0.17365f, -0.20791f, -0.24192f,
-							  -0.27564f, -0.30902f, -0.34202f, -0.37461f, -0.40674f, -0.43837f,
-							  -0.46947f, -0.50000f, -0.52992f, -0.55919f, -0.58779f, -0.61566f,
-							  -0.64279f, -0.66913f, -0.69466f, -0.71934f, -0.74314f, -0.76604f,
-							  -0.78801f, -0.80902f, -0.82904f, -0.84805f, -0.86603f, -0.88295f,
-							  -0.89879f, -0.91355f, -0.92718f, -0.93969f, -0.95106f, -0.96126f,
-							  -0.97030f, -0.97815f, -0.98481f, -0.99027f, -0.99452f, -0.99756f,
-							  -0.99939f, -1.00000f, -0.99939f, -0.99756f, -0.99452f, -0.99027f,
-							  -0.98481f, -0.97815f, -0.97030f, -0.96126f, -0.95106f, -0.93969f,
-							  -0.92718f, -0.91355f, -0.89879f, -0.88295f, -0.86603f, -0.84805f,
-							  -0.82904f, -0.80902f, -0.78801f, -0.76604f, -0.74314f, -0.71934f,
-							  -0.69466f, -0.66913f, -0.64279f, -0.61566f, -0.58779f, -0.55919f,
-							  -0.52992f, -0.50000f, -0.46947f, -0.43837f, -0.40674f, -0.37461f,
-							  -0.34202f, -0.30902f, -0.27564f, -0.24192f, -0.20791f, -0.17365f,
-							  -0.13917f, -0.10453f, -0.06976f, -0.03490f, -0.00000f, 0.03490f,
-							  0.06976f, 0.10453f, 0.13917f, 0.17365f, 0.20791f, 0.24192f, 0.27564f,
-							  0.30902f, 0.34202f, 0.37461f, 0.40674f, 0.43837f, 0.46947f, 0.50000f,
-							  0.52992f, 0.55919f, 0.58779f, 0.61566f, 0.64279f, 0.66913f, 0.69466f,
-							  0.71934f, 0.74314f, 0.76604f, 0.78801f, 0.80902f, 0.82904f, 0.84805f,
-							  0.86603f, 0.88295f, 0.89879f, 0.91355f, 0.92718f, 0.93969f, 0.95106f,
-							  0.96126f, 0.97030f, 0.97815f, 0.98481f, 0.99027f, 0.99452f, 0.99756f,
-							  0.99939f, 1.00000f, 0.99939f, 0.99756f, 0.99452f, 0.99027f, 0.98481f,
-							  0.97815f, 0.97030f, 0.96126f, 0.95106f, 0.93969f, 0.92718f, 0.91355f,
-							  0.89879f, 0.88295f, 0.86603f, 0.84805f, 0.82904f, 0.80902f, 0.78801f,
-							  0.76604f, 0.74314f, 0.71934f, 0.69466f, 0.66913f, 0.64279f, 0.61566f,
-							  0.58779f, 0.55919f, 0.52992f, 0.50000f, 0.46947f, 0.43837f, 0.40674f,
-							  0.37461f, 0.34202f, 0.30902f, 0.27564f, 0.24192f, 0.20791f, 0.17365f,
-							  0.13917f, 0.10453f, 0.06976f, 0.03490f, 0.00000f, -0.03490f, -0.06976f,
-							  -0.10453f, -0.13917f, -0.17365f, -0.20791f, -0.24192f, -0.27564f,
-							  -0.30902f, -0.34202f, -0.37461f, -0.40674f, -0.43837f, -0.46947f,
-							  -0.50000f, -0.52992f, -0.55919f, -0.58779f, -0.61566f, -0.64279f,
-							  -0.66913f, -0.69466f, -0.71934f, -0.74314f, -0.76604f, -0.78801f,
-							  -0.80902f, -0.82904f, -0.84805f, -0.86603f, -0.88295f, -0.89879f,
-							  -0.91355f, -0.92718f, -0.93969f, -0.95106f, -0.96126f, -0.97030f,
-							  -0.97815f, -0.98481f, -0.99027f, -0.99452f, -0.99756f, -0.99939f,
-							  -1.00000f, -0.99939f, -0.99756f, -0.99452f, -0.99027f, -0.98481f,
-							  -0.97815f, -0.97030f, -0.96126f, -0.95106f, -0.93969f, -0.92718f,
-							  -0.91355f, -0.89879f, -0.88295f, -0.86603f, -0.84805f, -0.82904f,
-							  -0.80902f, -0.78801f, -0.76604f, -0.74314f, -0.71934f, -0.69466f,
-							  -0.66913f, -0.64279f, -0.61566f, -0.58779f, -0.55919f, -0.52992f,
-							  -0.50000f, -0.46947f, -0.43837f, -0.40674f, -0.37461f, -0.34202f,
-							  -0.30902f, -0.27564f, -0.24192f, -0.20791f, -0.17365f, -0.13917f,
-							  -0.10453f, -0.06976f, -0.03490f, -0.00000f, 0.03490f, 0.06976f,
-							  0.10453f, 0.13917f, 0.17365f, 0.20791f, 0.24192f, 0.27564f, 0.30902f,
-							  0.34202f, 0.37461f, 0.40674f, 0.43837f, 0.46947f, 0.50000f, 0.52992f,
-							  0.55919f, 0.58779f, 0.61566f, 0.64279f, 0.66913f, 0.69466f, 0.71934f,
-							  0.74314f, 0.76604f, 0.78801f, 0.80902f, 0.82904f, 0.84805f, 0.86603f,
-							  0.88295f, 0.89879f, 0.91355f, 0.92718f, 0.93969f, 0.95106f, 0.96126f,
-							  0.97030f, 0.97815f, 0.98481f, 0.99027f, 0.99452f, 0.99756f, 0.99939f,
-							  1.00000f};
+// const float cos_table[361] = {1.00000f, 0.99939f, 0.99756f, 0.99452f, 0.99027f,
+// 							  0.98481f, 0.97815f, 0.97030f, 0.96126f, 0.95106f, 0.93969f, 0.92718f,
+// 							  0.91355f, 0.89879f, 0.88295f, 0.86603f, 0.84805f, 0.82904f, 0.80902f,
+// 							  0.78801f, 0.76604f, 0.74314f, 0.71934f, 0.69466f, 0.66913f, 0.64279f,
+// 							  0.61566f, 0.58779f, 0.55919f, 0.52992f, 0.50000f, 0.46947f, 0.43837f,
+// 							  0.40674f, 0.37461f, 0.34202f, 0.30902f, 0.27564f, 0.24192f, 0.20791f,
+// 							  0.17365f, 0.13917f, 0.10453f, 0.06976f, 0.03490f, 0.00000f, -0.03490f,
+// 							  -0.06976f, -0.10453f, -0.13917f, -0.17365f, -0.20791f, -0.24192f,
+// 							  -0.27564f, -0.30902f, -0.34202f, -0.37461f, -0.40674f, -0.43837f,
+// 							  -0.46947f, -0.50000f, -0.52992f, -0.55919f, -0.58779f, -0.61566f,
+// 							  -0.64279f, -0.66913f, -0.69466f, -0.71934f, -0.74314f, -0.76604f,
+// 							  -0.78801f, -0.80902f, -0.82904f, -0.84805f, -0.86603f, -0.88295f,
+// 							  -0.89879f, -0.91355f, -0.92718f, -0.93969f, -0.95106f, -0.96126f,
+// 							  -0.97030f, -0.97815f, -0.98481f, -0.99027f, -0.99452f, -0.99756f,
+// 							  -0.99939f, -1.00000f, -0.99939f, -0.99756f, -0.99452f, -0.99027f,
+// 							  -0.98481f, -0.97815f, -0.97030f, -0.96126f, -0.95106f, -0.93969f,
+// 							  -0.92718f, -0.91355f, -0.89879f, -0.88295f, -0.86603f, -0.84805f,
+// 							  -0.82904f, -0.80902f, -0.78801f, -0.76604f, -0.74314f, -0.71934f,
+// 							  -0.69466f, -0.66913f, -0.64279f, -0.61566f, -0.58779f, -0.55919f,
+// 							  -0.52992f, -0.50000f, -0.46947f, -0.43837f, -0.40674f, -0.37461f,
+// 							  -0.34202f, -0.30902f, -0.27564f, -0.24192f, -0.20791f, -0.17365f,
+// 							  -0.13917f, -0.10453f, -0.06976f, -0.03490f, -0.00000f, 0.03490f,
+// 							  0.06976f, 0.10453f, 0.13917f, 0.17365f, 0.20791f, 0.24192f, 0.27564f,
+// 							  0.30902f, 0.34202f, 0.37461f, 0.40674f, 0.43837f, 0.46947f, 0.50000f,
+// 							  0.52992f, 0.55919f, 0.58779f, 0.61566f, 0.64279f, 0.66913f, 0.69466f,
+// 							  0.71934f, 0.74314f, 0.76604f, 0.78801f, 0.80902f, 0.82904f, 0.84805f,
+// 							  0.86603f, 0.88295f, 0.89879f, 0.91355f, 0.92718f, 0.93969f, 0.95106f,
+// 							  0.96126f, 0.97030f, 0.97815f, 0.98481f, 0.99027f, 0.99452f, 0.99756f,
+// 							  0.99939f, 1.00000f, 0.99939f, 0.99756f, 0.99452f, 0.99027f, 0.98481f,
+// 							  0.97815f, 0.97030f, 0.96126f, 0.95106f, 0.93969f, 0.92718f, 0.91355f,
+// 							  0.89879f, 0.88295f, 0.86603f, 0.84805f, 0.82904f, 0.80902f, 0.78801f,
+// 							  0.76604f, 0.74314f, 0.71934f, 0.69466f, 0.66913f, 0.64279f, 0.61566f,
+// 							  0.58779f, 0.55919f, 0.52992f, 0.50000f, 0.46947f, 0.43837f, 0.40674f,
+// 							  0.37461f, 0.34202f, 0.30902f, 0.27564f, 0.24192f, 0.20791f, 0.17365f,
+// 							  0.13917f, 0.10453f, 0.06976f, 0.03490f, 0.00000f, -0.03490f, -0.06976f,
+// 							  -0.10453f, -0.13917f, -0.17365f, -0.20791f, -0.24192f, -0.27564f,
+// 							  -0.30902f, -0.34202f, -0.37461f, -0.40674f, -0.43837f, -0.46947f,
+// 							  -0.50000f, -0.52992f, -0.55919f, -0.58779f, -0.61566f, -0.64279f,
+// 							  -0.66913f, -0.69466f, -0.71934f, -0.74314f, -0.76604f, -0.78801f,
+// 							  -0.80902f, -0.82904f, -0.84805f, -0.86603f, -0.88295f, -0.89879f,
+// 							  -0.91355f, -0.92718f, -0.93969f, -0.95106f, -0.96126f, -0.97030f,
+// 							  -0.97815f, -0.98481f, -0.99027f, -0.99452f, -0.99756f, -0.99939f,
+// 							  -1.00000f, -0.99939f, -0.99756f, -0.99452f, -0.99027f, -0.98481f,
+// 							  -0.97815f, -0.97030f, -0.96126f, -0.95106f, -0.93969f, -0.92718f,
+// 							  -0.91355f, -0.89879f, -0.88295f, -0.86603f, -0.84805f, -0.82904f,
+// 							  -0.80902f, -0.78801f, -0.76604f, -0.74314f, -0.71934f, -0.69466f,
+// 							  -0.66913f, -0.64279f, -0.61566f, -0.58779f, -0.55919f, -0.52992f,
+// 							  -0.50000f, -0.46947f, -0.43837f, -0.40674f, -0.37461f, -0.34202f,
+// 							  -0.30902f, -0.27564f, -0.24192f, -0.20791f, -0.17365f, -0.13917f,
+// 							  -0.10453f, -0.06976f, -0.03490f, -0.00000f, 0.03490f, 0.06976f,
+// 							  0.10453f, 0.13917f, 0.17365f, 0.20791f, 0.24192f, 0.27564f, 0.30902f,
+// 							  0.34202f, 0.37461f, 0.40674f, 0.43837f, 0.46947f, 0.50000f, 0.52992f,
+// 							  0.55919f, 0.58779f, 0.61566f, 0.64279f, 0.66913f, 0.69466f, 0.71934f,
+// 							  0.74314f, 0.76604f, 0.78801f, 0.80902f, 0.82904f, 0.84805f, 0.86603f,
+// 							  0.88295f, 0.89879f, 0.91355f, 0.92718f, 0.93969f, 0.95106f, 0.96126f,
+// 							  0.97030f, 0.97815f, 0.98481f, 0.99027f, 0.99452f, 0.99756f, 0.99939f,
+// 							  1.00000f};
 
 /* USER CODE END PV */
 
@@ -277,10 +311,11 @@ static void MX_SPI2_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 void StartDefaultTask(void *argument);
-void menu(void *argument);
+void handleMenu(void *argument);
 void handleButtonPress(void *argument);
 void handleEncoder(void *argument);
 void handleMusicPlayer(void *argument);
+void handleFFT(void *argument);
 
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
@@ -291,40 +326,40 @@ void handleMusicPlayer(void *argument);
 /* USER CODE END 0 */
 
 /**
- * @brief  The application entry point.
- * @retval int
- */
+  * @brief  The application entry point.
+  * @retval int
+  */
 int main(void)
 {
 
-	/* USER CODE BEGIN 1 */
+  /* USER CODE BEGIN 1 */
 
-	/* USER CODE END 1 */
+  /* USER CODE END 1 */
 
-	/* MCU Configuration--------------------------------------------------------*/
+  /* MCU Configuration--------------------------------------------------------*/
 
-	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	HAL_Init();
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-	/* USER CODE BEGIN Init */
+  /* USER CODE BEGIN Init */
 
-	/* USER CODE END Init */
+  /* USER CODE END Init */
 
-	/* Configure the system clock */
-	SystemClock_Config();
+  /* Configure the system clock */
+  SystemClock_Config();
 
-	/* USER CODE BEGIN SysInit */
+  /* USER CODE BEGIN SysInit */
 
-	/* USER CODE END SysInit */
+  /* USER CODE END SysInit */
 
-	/* Initialize all configured peripherals */
-	MX_GPIO_Init();
-	MX_I2C1_Init();
-	MX_FATFS_Init();
-	MX_SPI2_Init();
-	MX_TIM2_Init();
-	MX_TIM3_Init();
-	/* USER CODE BEGIN 2 */
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  MX_FATFS_Init();
+  MX_SPI2_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
+  /* USER CODE BEGIN 2 */
 
 	// si falla la conexion i2c se hace una hard fault
 	if (SSD1306_Init() == 0)
@@ -339,350 +374,363 @@ int main(void)
 	HAL_TIM_PWM_Start_IT(&htim2, TIM_CHANNEL_1);
 	HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
 
-	/* USER CODE END 2 */
+  /* USER CODE END 2 */
 
-	/* Init scheduler */
-	osKernelInitialize();
-	/* Create the mutex(es) */
-	/* creation of menuMutex */
-	menuMutexHandle = osMutexNew(&menuMutex_attributes);
+  /* Init scheduler */
+  osKernelInitialize();
+  /* Create the mutex(es) */
+  /* creation of menuMutex */
+  menuMutexHandle = osMutexNew(&menuMutex_attributes);
 
-	/* creation of playerMutex */
-	playerMutexHandle = osMutexNew(&playerMutex_attributes);
+  /* creation of playerMutex */
+  playerMutexHandle = osMutexNew(&playerMutex_attributes);
 
-	/* USER CODE BEGIN RTOS_MUTEX */
+  /* creation of fftMutex */
+  fftMutexHandle = osMutexNew(&fftMutex_attributes);
+
+  /* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
-	/* USER CODE END RTOS_MUTEX */
+  /* USER CODE END RTOS_MUTEX */
 
-	/* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
 	/* add semaphores, ... */
-	/* USER CODE END RTOS_SEMAPHORES */
+  /* USER CODE END RTOS_SEMAPHORES */
 
-	/* USER CODE BEGIN RTOS_TIMERS */
+  /* USER CODE BEGIN RTOS_TIMERS */
 	/* start timers, add new ones, ... */
-	/* USER CODE END RTOS_TIMERS */
+  /* USER CODE END RTOS_TIMERS */
 
-	/* USER CODE BEGIN RTOS_QUEUES */
+  /* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
-	/* USER CODE END RTOS_QUEUES */
+  /* USER CODE END RTOS_QUEUES */
 
-	/* Create the thread(s) */
-	/* creation of defaultTask */
-	defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* Create the thread(s) */
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
-	/* creation of menuTask */
-	menuTaskHandle = osThreadNew(menu, (void *)(&displayParams), &menuTask_attributes);
+  /* creation of menuTask */
+  menuTaskHandle = osThreadNew(handleMenu, (void*) (&displayParams), &menuTask_attributes);
 
-	/* creation of acceptButtonTas */
-	acceptButtonTasHandle = osThreadNew(handleButtonPress, (void *)(&acceptButtonParams), &acceptButtonTas_attributes);
+  /* creation of acceptButtonTas */
+  acceptButtonTasHandle = osThreadNew(handleButtonPress, (void*) (&acceptButtonParams), &acceptButtonTas_attributes);
 
-	/* creation of cancelButtonTas */
-	cancelButtonTasHandle = osThreadNew(handleButtonPress, (void *)(&cancelButtonParams), &cancelButtonTas_attributes);
+  /* creation of cancelButtonTas */
+  cancelButtonTasHandle = osThreadNew(handleButtonPress, (void*) (&cancelButtonParams), &cancelButtonTas_attributes);
 
-	/* creation of encoderTask */
-	encoderTaskHandle = osThreadNew(handleEncoder, NULL, &encoderTask_attributes);
+  /* creation of encoderTask */
+  encoderTaskHandle = osThreadNew(handleEncoder, NULL, &encoderTask_attributes);
 
-	/* creation of musicPlayer */
-	musicPlayerHandle = osThreadNew(handleMusicPlayer, NULL, &musicPlayer_attributes);
+  /* creation of musicPlayer */
+  musicPlayerHandle = osThreadNew(handleMusicPlayer, NULL, &musicPlayer_attributes);
 
-	/* USER CODE BEGIN RTOS_THREADS */
+  /* creation of transformTask */
+  transformTaskHandle = osThreadNew(handleFFT, NULL, &transformTask_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
-	/* USER CODE END RTOS_THREADS */
+  /* USER CODE END RTOS_THREADS */
 
-	/* USER CODE BEGIN RTOS_EVENTS */
+  /* USER CODE BEGIN RTOS_EVENTS */
 	/* add events, ... */
-	/* USER CODE END RTOS_EVENTS */
+  /* USER CODE END RTOS_EVENTS */
 
-	/* Start scheduler */
-	osKernelStart();
+  /* Start scheduler */
+  osKernelStart();
 
-	/* We should never get here as control is now taken by the scheduler */
+  /* We should never get here as control is now taken by the scheduler */
 
-	/* Infinite loop */
-	/* USER CODE BEGIN WHILE */
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
 	while (1)
 	{
-		/* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-		/* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
 	}
-	/* USER CODE END 3 */
+  /* USER CODE END 3 */
 }
 
 /**
- * @brief System Clock Configuration
- * @retval None
- */
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
-	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-	/** Initializes the RCC Oscillators according to the specified parameters
-	 * in the RCC_OscInitTypeDef structure.
-	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-	RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-	RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-	{
-		Error_Handler();
-	}
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-	/** Initializes the CPU, AHB and APB buses clocks
-	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-	{
-		Error_Handler();
-	}
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /**
- * @brief I2C1 Initialization Function
- * @param None
- * @retval None
- */
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
 static void MX_I2C1_Init(void)
 {
 
-	/* USER CODE BEGIN I2C1_Init 0 */
+  /* USER CODE BEGIN I2C1_Init 0 */
 
-	/* USER CODE END I2C1_Init 0 */
+  /* USER CODE END I2C1_Init 0 */
 
-	/* USER CODE BEGIN I2C1_Init 1 */
+  /* USER CODE BEGIN I2C1_Init 1 */
 
-	/* USER CODE END I2C1_Init 1 */
-	hi2c1.Instance = I2C1;
-	hi2c1.Init.ClockSpeed = 400000;
-	hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-	hi2c1.Init.OwnAddress1 = 0;
-	hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-	hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-	hi2c1.Init.OwnAddress2 = 0;
-	hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-	hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-	if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	/* USER CODE BEGIN I2C1_Init 2 */
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 400000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
 
-	/* USER CODE END I2C1_Init 2 */
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
- * @brief SPI2 Initialization Function
- * @param None
- * @retval None
- */
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
 static void MX_SPI2_Init(void)
 {
 
-	/* USER CODE BEGIN SPI2_Init 0 */
+  /* USER CODE BEGIN SPI2_Init 0 */
 
-	/* USER CODE END SPI2_Init 0 */
+  /* USER CODE END SPI2_Init 0 */
 
-	/* USER CODE BEGIN SPI2_Init 1 */
+  /* USER CODE BEGIN SPI2_Init 1 */
 
-	/* USER CODE END SPI2_Init 1 */
-	/* SPI2 parameter configuration*/
-	hspi2.Instance = SPI2;
-	hspi2.Init.Mode = SPI_MODE_MASTER;
-	hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-	hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-	hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
-	hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
-	hspi2.Init.NSS = SPI_NSS_SOFT;
-	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
-	hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
-	hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-	hspi2.Init.CRCPolynomial = 10;
-	if (HAL_SPI_Init(&hspi2) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	/* USER CODE BEGIN SPI2_Init 2 */
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
 
-	/* USER CODE END SPI2_Init 2 */
+  /* USER CODE END SPI2_Init 2 */
+
 }
 
 /**
- * @brief TIM2 Initialization Function
- * @param None
- * @retval None
- */
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
 static void MX_TIM2_Init(void)
 {
 
-	/* USER CODE BEGIN TIM2_Init 0 */
+  /* USER CODE BEGIN TIM2_Init 0 */
 
-	/* USER CODE END TIM2_Init 0 */
+  /* USER CODE END TIM2_Init 0 */
 
-	TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-	TIM_MasterConfigTypeDef sMasterConfig = {0};
-	TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
-	/* USER CODE BEGIN TIM2_Init 1 */
+  /* USER CODE BEGIN TIM2_Init 1 */
 
-	/* USER CODE END TIM2_Init 1 */
-	htim2.Instance = TIM2;
-	htim2.Init.Prescaler = 1 - 1;
-	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim2.Init.Period = 720 - 1;
-	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-	if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-	if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-	if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = 500;
-	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-	if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	/* USER CODE BEGIN TIM2_Init 2 */
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 1-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 720-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 500;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
 
-	/* USER CODE END TIM2_Init 2 */
-	HAL_TIM_MspPostInit(&htim2);
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
 }
 
 /**
- * @brief TIM3 Initialization Function
- * @param None
- * @retval None
- */
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
 static void MX_TIM3_Init(void)
 {
 
-	/* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE BEGIN TIM3_Init 0 */
 
-	/* USER CODE END TIM3_Init 0 */
+  /* USER CODE END TIM3_Init 0 */
 
-	TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-	TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-	/* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE BEGIN TIM3_Init 1 */
 
-	/* USER CODE END TIM3_Init 1 */
-	htim3.Instance = TIM3;
-	htim3.Init.Prescaler = 0;
-	htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim3.Init.Period = 9000 - 1;
-	htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-	if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-	if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-	if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	/* USER CODE BEGIN TIM3_Init 2 */
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 9000-1;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
 
-	/* USER CODE END TIM3_Init 2 */
+  /* USER CODE END TIM3_Init 2 */
+
 }
 
 /**
- * @brief GPIO Initialization Function
- * @param None
- * @retval None
- */
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
 static void MX_GPIO_Init(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	/* USER CODE BEGIN MX_GPIO_Init_1 */
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
 
-	/* USER CODE END MX_GPIO_Init_1 */
+  /* USER CODE END MX_GPIO_Init_1 */
 
-	/* GPIO Ports Clock Enable */
-	__HAL_RCC_GPIOC_CLK_ENABLE();
-	__HAL_RCC_GPIOD_CLK_ENABLE();
-	__HAL_RCC_GPIOA_CLK_ENABLE();
-	__HAL_RCC_GPIOB_CLK_ENABLE();
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(DEBUG_ERROR_HANDLER_GPIO_Port, DEBUG_ERROR_HANDLER_Pin, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(DEBUG_ERROR_HANDLER_GPIO_Port, DEBUG_ERROR_HANDLER_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB, SD_CS_Pin | DEBUG_ERROR_HANDLERB10_Pin, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, SD_CS_Pin|DEBUG_ERROR_HANDLERB10_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOA, DEBUG_SCHEDULER_TICK_Pin | DEBUG_TASK_DEFAULT_Pin | DEBUG_TASK_ENCODER_Pin | DEBUG_TASK_PLAYER_Pin | DEBUG_TASK_MENU_Pin, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, DEBUG_SCHEDULER_TICK_Pin|DEBUG_TASK_DEFAULT_Pin|DEBUG_TASK_ENCODER_Pin|DEBUG_TASK_PLAYER_Pin
+                          |DEBUG_TASK_MENU_Pin|DEBUG_TASK_BUTTONS_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pin : DEBUG_ERROR_HANDLER_Pin */
-	GPIO_InitStruct.Pin = DEBUG_ERROR_HANDLER_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(DEBUG_ERROR_HANDLER_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin : DEBUG_ERROR_HANDLER_Pin */
+  GPIO_InitStruct.Pin = DEBUG_ERROR_HANDLER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DEBUG_ERROR_HANDLER_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : ENCODER_A_Pin ENCODER_B_Pin */
-	GPIO_InitStruct.Pin = ENCODER_A_Pin | ENCODER_B_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  /*Configure GPIO pins : ENCODER_A_Pin ENCODER_B_Pin */
+  GPIO_InitStruct.Pin = ENCODER_A_Pin|ENCODER_B_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : BTN_BACK_Pin BTN_ENTER_Pin */
-	GPIO_InitStruct.Pin = BTN_BACK_Pin | BTN_ENTER_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  /*Configure GPIO pins : BTN_BACK_Pin BTN_ENTER_Pin */
+  GPIO_InitStruct.Pin = BTN_BACK_Pin|BTN_ENTER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : SD_CS_Pin DEBUG_ERROR_HANDLERB10_Pin */
-	GPIO_InitStruct.Pin = SD_CS_Pin | DEBUG_ERROR_HANDLERB10_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /*Configure GPIO pins : SD_CS_Pin DEBUG_ERROR_HANDLERB10_Pin */
+  GPIO_InitStruct.Pin = SD_CS_Pin|DEBUG_ERROR_HANDLERB10_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : DEBUG_SCHEDULER_TICK_Pin DEBUG_TASK_DEFAULT_Pin DEBUG_TASK_ENCODER_Pin DEBUG_TASK_PLAYER_Pin
-							 DEBUG_TASK_MENU_Pin */
-	GPIO_InitStruct.Pin = DEBUG_SCHEDULER_TICK_Pin | DEBUG_TASK_DEFAULT_Pin | DEBUG_TASK_ENCODER_Pin | DEBUG_TASK_PLAYER_Pin | DEBUG_TASK_MENU_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  /*Configure GPIO pins : DEBUG_SCHEDULER_TICK_Pin DEBUG_TASK_DEFAULT_Pin DEBUG_TASK_ENCODER_Pin DEBUG_TASK_PLAYER_Pin
+                           DEBUG_TASK_MENU_Pin DEBUG_TASK_BUTTONS_Pin */
+  GPIO_InitStruct.Pin = DEBUG_SCHEDULER_TICK_Pin|DEBUG_TASK_DEFAULT_Pin|DEBUG_TASK_ENCODER_Pin|DEBUG_TASK_PLAYER_Pin
+                          |DEBUG_TASK_MENU_Pin|DEBUG_TASK_BUTTONS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-	/* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
 
-	/* USER CODE END MX_GPIO_Init_2 */
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -703,32 +751,103 @@ float fast_sqrt(float number)
 }
 
 // Callback para cuando se entra a una tarea
-void callback(int tag, Bool shouldActivate)
+void debug_callback(int tag, Bool shouldActivate)
 {
 	GPIO_PinState pinState = shouldActivate ? GPIO_PIN_SET : GPIO_PIN_RESET;
 	switch (tag)
 	{
 	case PLAYER_TASK_TAG:
-		HAL_GPIO_WritePin(DEBUG_TASK_PLAYER_GPIO_Port, DEBUG_TASK_PLAYER_Pin, pinState);
+		HAL_GPIO_WritePin(DEBUG_TASK_PLAYER_GPIO_Port, DEBUG_TASK_PLAYER_Pin,
+						  pinState);
 		break;
 	case MENU_TASK_TAG:
-		HAL_GPIO_WritePin(DEBUG_TASK_MENU_GPIO_Port, DEBUG_TASK_MENU_Pin, pinState);
+		HAL_GPIO_WritePin(DEBUG_TASK_MENU_GPIO_Port, DEBUG_TASK_MENU_Pin,
+						  pinState);
 		break;
 	case ENCONDER_TASK_TAG:
-		HAL_GPIO_WritePin(DEBUG_TASK_ENCODER_GPIO_Port, DEBUG_TASK_ENCODER_Pin, pinState);
+		HAL_GPIO_WritePin(DEBUG_TASK_ENCODER_GPIO_Port, DEBUG_TASK_ENCODER_Pin,
+						  pinState);
 		break;
+
 	case DEFAULT_TASK_TAG:
-		HAL_GPIO_WritePin(DEBUG_TASK_DEFAULT_GPIO_Port, DEBUG_TASK_DEFAULT_Pin, pinState);
+		HAL_GPIO_WritePin(DEBUG_TASK_DEFAULT_GPIO_Port, DEBUG_TASK_DEFAULT_Pin,
+						  pinState);
 		break;
+	case BUTTONS_TASK_TAG:
+		HAL_GPIO_WritePin(DEBUG_TASK_BUTTONS_GPIO_Port, DEBUG_TASK_BUTTONS_Pin,
+						  pinState);
 	default:
 		break;
 	}
 }
 
+// Actualiza la lista de archivos en el directorio actual
+FRESULT searchFilesInFolder()
+{
+	uint16_t count = 0;
+	FILINFO fno;
+	DIR dir;
+
+	// fres = f_opendir(&dir, audioPlayerOpts.currentPath);
+	fres = f_opendir(&dir, "/");
+	if (fres != FR_OK)
+		return fres;
+
+	fileBrowser.fileCount = 0;
+
+	while (1)
+	{
+		fres = f_readdir(&dir, &fno);
+		if (fres != FR_OK || fno.fname[0] == 0)
+			break;
+
+		// saltan los archivos que no son  wav
+		if (!(fno.fattrib & AM_DIR) && (strstr(fno.fname, ".wav") || strstr(fno.fname, ".WAV")))
+		{
+			if (count < MAX_FILES)
+			{
+				strncpy(fileBrowser.filenames[count], fno.fname, sizeof(fileBrowser.filenames[count]));
+				fileBrowser.filenames[count][255] = '\0';
+				count++;
+			}
+		}
+	}
+
+	fileBrowser.fileCount = count;
+	fileBrowser.selectedIndex = 0;
+	f_closedir(&dir);
+	return FR_OK;
+}
+
+// void SelectCurrentFile()
+// {
+// 	if (fileBrowser.fileCount == 0)
+// 		return;
+
+// 	char fullPath[256];
+// 	// snprintf(fullPath, sizeof(fullPath), "%s/%s",
+// 	// 		 audioPlayerOpts.currentPath,
+// 	// 		 fileBrowser.filenames[fileBrowser.selectedIndex]);
+
+// 	if (fil.obj.fs != 0)
+// 	{
+// 		f_close(&fil);
+// 	}
+
+// 	fres = f_open(&fil, fullPath, FA_READ);
+// 	if (fres == FR_OK)
+// 	{
+// 		strncpy(audioPlayerOpts.filename, fullPath, sizeof(audioPlayerOpts.filename) - 1);
+// 		audioPlayerOpts.filename[sizeof(audioPlayerOpts.filename) - 1] = '\0';
+// 		audioPlayerOpts.bufIndex = 0;
+// 		audioPlayerOpts.shouldLoadBuffer = TRUE;
+// 	}
+// }
+
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
 
-	callback(DEFAULT_TASK_TAG, TRUE);
+	// debug_callback(DEFAULT_TASK_TAG, TRUE);
 
 	// Esto lo hice para probar que funcionaba con las muestras dadas
 	// TIM2->CCR1 = musica[audioPlayerOpts.bufIndex];
@@ -736,17 +855,17 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if (!audioPlayerOpts.shouldLoadBuffer)
 	{
-		// osMutexAcquire(playerMutexHandle, osWaitForever);
+		osMutexAcquire(playerMutexHandle, osWaitForever);
 		audioPlayerOpts.bufIndex = (audioPlayerOpts.bufIndex + 1) % AUDIO_BUFFER_SIZE;
-		TIM2->CCR1 = mp3Buf[audioPlayerOpts.bufIndex]; // lo hago x3 porque son de 256 y el máximo es 720 (se va a saturar un poco, pero tampoco es tanto)
+		TIM2->CCR1 = wavBuffer[audioPlayerOpts.bufIndex] * 2.8; // lo hago x3 porque son de 256 y el máximo es 720 (se va a saturar un poco, pero tampoco es tanto)
 
 		if (audioPlayerOpts.bufIndex == (AUDIO_BUFFER_SIZE - 1))
 		{
 			audioPlayerOpts.shouldLoadBuffer = TRUE;
 		}
-		// osMutexRelease(playerMutexHandle);
+		osMutexRelease(playerMutexHandle);
 	}
-	callback(DEFAULT_TASK_TAG, FALSE);
+	// debug_callback(DEFAULT_TASK_TAG, FALSE);
 }
 
 /* USER CODE END 4 */
@@ -760,42 +879,54 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
-	/* USER CODE BEGIN 5 */
-	// vTaskSetApplicationTaskTag(NULL, (void *)DEFAULT_TASK_TAG);
-
+  /* USER CODE BEGIN 5 */
+	vTaskSetApplicationTaskTag(NULL, (void *)DEFAULT_TASK_TAG);
 	/* Infinite loop */
 	for (;;)
 	{
-		if (HAL_GetTick() - lastInteractionTick > SCREEN_SAVER_TIMEOUT)
+		if (displayParams.menu != FILES && displayParams.menu != EQUALIZER && displayParams.menu != ERROR_STATE)
 		{
-			displayParams.menu = START;
+			if (HAL_GetTick() - lastInteractionTick > SCREEN_SAVER_TIMEOUT)
+			{
+				osMutexAcquire(menuMutexHandle, osWaitForever);
+				displayParams.menu = START;
+				osMutexRelease(menuMutexHandle);
+			}
 		}
-		osDelay(1);
+
+#ifdef DEBUG_WATERMARK
+		uxHighWaterMark_TASK1 = uxTaskGetStackHighWaterMark(NULL);
+#endif
+
+		osDelay(20);
 	}
-	/* USER CODE END 5 */
+  /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_menu */
+/* USER CODE BEGIN Header_handleMenu */
 /**
  * @brief Function implementing the menuTask thread.
  * @param argument: Not used
  * @retval None
  */
-/* USER CODE END Header_menu */
-void menu(void *argument)
+/* USER CODE END Header_handleMenu */
+void handleMenu(void *argument)
 {
-	/* USER CODE BEGIN menu */
-	/* Infinite loop */
-
+  /* USER CODE BEGIN handleMenu */
 	vTaskSetApplicationTaskTag(NULL, (void *)MENU_TASK_TAG);
 
 	DisplayMenu menu = START;
 	DisplayMenu prevMenu = START;
 
-	const uint16_t halfWidth = SCREEN_WIDTH / 2;
-	const uint16_t halfHeight = SCREEN_HEIGHT / 2;
+	// uint32_t temp_angle;
+	uint32_t ballHeight1 = 0;
+	uint32_t ballHeight2 = -10;
+	uint32_t ballHeight3 = 10;
 
-	uint32_t temp_angle;
+	uint32_t ballVelocity1 = 1;
+	uint32_t ballVelocity2 = 1;
+	uint32_t ballVelocity3 = 1;
+
 	for (;;)
 	{
 
@@ -811,66 +942,118 @@ void menu(void *argument)
 		{
 		case START:
 
-			SSD1306_DrawFilledCircle(halfWidth, halfHeight,
-									 SCREEN_HEIGHT / 3 + 7, SSD1306_COLOR_BLACK);
+			SSD1306_DrawFilledCircle(SCREEN_WIDTH_1_4, SCREEN_HEIGHT_2 + ballHeight1,
+									 5, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledCircle(SCREEN_WIDTH_1_4, SCREEN_HEIGHT_2 + (ballHeight1 - ballVelocity1),
+									 5, SSD1306_COLOR_BLACK);
 
-			temp_angle =
-				prev_point_angle + 60 > 360 ? (prev_point_angle + 60) - 360 : prev_point_angle + 60;
-			SSD1306_DrawFilledCircle(
-				halfWidth + SCREEN_HEIGHT / 3 * cos_table[temp_angle],
-				halfHeight + SCREEN_HEIGHT / 3 * sin_table[temp_angle], 6,
-				SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledCircle(SCREEN_WIDTH_2_4, SCREEN_HEIGHT_2 + ballHeight2,
+									 7, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledCircle(SCREEN_WIDTH_2_4, SCREEN_HEIGHT_2 + (ballHeight2 - ballVelocity2),
+									 7, SSD1306_COLOR_BLACK);
 
-			temp_angle =
-				prev_point_angle + 30 > 360 ? (prev_point_angle + 30) - 360 : prev_point_angle + 30;
-			SSD1306_DrawFilledCircle(
-				halfWidth + SCREEN_HEIGHT / 3 * cos_table[temp_angle],
-				64 / 2 + 64 / 3 * sin_table[temp_angle], 4,
-				SSD1306_COLOR_WHITE);
-			SSD1306_DrawFilledCircle(
-				halfWidth + SCREEN_HEIGHT / 3 * cos_table[point_angle],
-				64 / 2 + 64 / 3 * sin_table[point_angle], 2,
-				SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledCircle(SCREEN_WIDTH_3_4, SCREEN_HEIGHT_2 + ballHeight3,
+									 9, SSD1306_COLOR_WHITE);
+			SSD1306_DrawFilledCircle(SCREEN_WIDTH_3_4, SCREEN_HEIGHT_2 + (ballHeight3 - ballVelocity3),
+									 9, SSD1306_COLOR_BLACK);
 
-			if (point_angle >= 360)
+			ballHeight1 += ballVelocity1;
+			ballHeight2 += ballVelocity2;
+			ballHeight3 += ballVelocity3;
+
+			if (SCREEN_HEIGHT_2 + ballHeight1 >= (SCREEN_HEIGHT - 5) || SCREEN_HEIGHT_2 + ballHeight1 < 5)
 			{
-				prev_point_angle = point_angle;
-				point_angle = 0;
+				ballVelocity1 = -ballVelocity1;
+				ballHeight1 += ballVelocity1;
 			}
-			else
+			if (SCREEN_HEIGHT_2 + ballHeight2 >= (SCREEN_HEIGHT - 7) || SCREEN_HEIGHT_2 + ballHeight2 < (7))
 			{
-				prev_point_angle = point_angle;
-				point_angle += 8;
+				ballVelocity2 = -ballVelocity2;
+				ballHeight2 += ballVelocity2;
 			}
+			if (SCREEN_HEIGHT_2 + ballHeight3 >= (SCREEN_HEIGHT - 9) || SCREEN_HEIGHT_2 + ballHeight3 < 9)
+			{
+				ballVelocity3 = -ballVelocity3;
+				ballHeight3 += ballVelocity3;
+			}
+
+			// SSD1306_DrawFilledCircle(halfWidth, halfHeight,
+			// 						 SCREEN_HEIGHT / 3 + 7, SSD1306_COLOR_BLACK);
+
+			// temp_angle =
+			// 	prev_point_angle + 60 > 360 ? (prev_point_angle + 60) - 360 : prev_point_angle + 60;
+			// SSD1306_DrawFilledCircle(
+			// 	halfWidth + SCREEN_HEIGHT / 3 * cos_table[temp_angle],
+			// 	halfHeight + SCREEN_HEIGHT / 3 * sin_table[temp_angle], 6,
+			// 	SSD1306_COLOR_WHITE);
+
+			// temp_angle =
+			// 	prev_point_angle + 30 > 360 ? (prev_point_angle + 30) - 360 : prev_point_angle + 30;
+			// SSD1306_DrawFilledCircle(
+			// 	halfWidth + SCREEN_HEIGHT / 3 * cos_table[temp_angle],
+			// 	64 / 2 + 64 / 3 * sin_table[temp_angle], 4,
+			// 	SSD1306_COLOR_WHITE);
+			// SSD1306_DrawFilledCircle(
+			// 	halfWidth + SCREEN_HEIGHT / 3 * cos_table[point_angle],
+			// 	64 / 2 + 64 / 3 * sin_table[point_angle], 2,
+			// 	SSD1306_COLOR_WHITE);
+
+			// if (point_angle >= 360)
+			// {
+			// 	prev_point_angle = point_angle;
+			// 	point_angle = 0;
+			// }
+			// else
+			// {
+			// 	prev_point_angle = point_angle;
+			// 	point_angle += 8;
+			// }
 
 			break;
 		case MENU:
-			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
 			SSD1306_Puts("< Menu >", &Font_7x10, 1);
 			break;
-		case EQUALIZER:
-			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+		case EQUALIZER_MENU:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
 			SSD1306_Puts("< Equal >", &Font_7x10, 1);
 			break;
 		case EQUALIZER_HIGH:
-			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
 			SSD1306_Puts("< Altos >", &Font_7x10, 1);
 			break;
 		case EQUALIZER_MID:
-			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
 			SSD1306_Puts("< Medios >", &Font_7x10, 1);
 			break;
 		case EQUALIZER_LOW:
-			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
 			SSD1306_Puts("< Bajos >", &Font_7x10, 1);
 			break;
 		case FOLDER_SEARCH:
-			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
 			SSD1306_Puts("< Carpetas >", &Font_7x10, 1);
 			break;
 		case FILES_SEARCH:
-			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT / 2);
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
 			SSD1306_Puts("< Archivos >", &Font_7x10, 1);
+			break;
+		case FILES:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
+			SSD1306_Puts(fileBrowser.filenames[fileBrowser.selectedIndex], &Font_7x10, 1);
+			break;
+		case DIRECTORIES:
+			break;
+
+		case ERROR_STATE:
+			SSD1306_GotoXY(TEXT_X_OFFSET, SCREEN_HEIGHT_2);
+			SSD1306_Puts(displayParams.errorMessage, &Font_7x10, 1);
+			break;
+
+		case EQUALIZER:
+			SSD1306_GotoXY(0, SCREEN_HEIGHT);
+			for (int i = 0; i < 64; i++)
+				SSD1306_DrawFilledRectangle(i * 2, 0, 1, wavBufferFFT[i].real, SSD1306_COLOR_WHITE);
 			break;
 
 		default:
@@ -878,11 +1061,14 @@ void menu(void *argument)
 		}
 
 		SSD1306_UpdateScreen();
-		osDelay(50);
-		// TODO: agregar toggle pin de debug
-		// HAL_GPIO_TogglePin(GPIO, GPIO_Pin)
+
+#ifdef DEBUG_WATERMARK
+		uxHighWaterMark_TASK2 = uxTaskGetStackHighWaterMark(NULL);
+#endif
+
+		osDelay(67);
 	}
-	/* USER CODE END menu */
+  /* USER CODE END handleMenu */
 }
 
 /* USER CODE BEGIN Header_handleButtonPress */
@@ -894,7 +1080,9 @@ void menu(void *argument)
 /* USER CODE END Header_handleButtonPress */
 void handleButtonPress(void *argument)
 {
-	/* USER CODE BEGIN handleButtonPress */
+  /* USER CODE BEGIN handleButtonPress */
+
+	vTaskSetApplicationTaskTag(NULL, (void *)BUTTONS_TASK_TAG);
 
 	/* Infinite loop */
 	Bool isButtonPressed = FALSE;
@@ -914,16 +1102,53 @@ void handleButtonPress(void *argument)
 		if (HAL_GPIO_ReadPin(btnParams.port, btnParams.pin) == GPIO_PIN_RESET && isButtonPressed == FALSE)
 		{
 			isButtonPressed = TRUE;
+			lastInteractionTick = HAL_GetTick();
 
 			// lógica del boton aceptar
 			if (btnParams.type == ACCEPT)
 			{
-				lastInteractionTick = HAL_GetTick();
 
 				switch (displayParams.menu)
 				{
 				case START:
 					displayParams.menu = MENU;
+					break;
+				case EQUALIZER_MENU:
+					displayParams.menu = EQUALIZER;
+					break;
+				case FILES_SEARCH:
+				{
+					// Se detiene la lectura del archivo de musica
+					osMutexAcquire(playerMutexHandle, osWaitForever);
+					audioPlayerOpts.isReadingMusicFile = FALSE;
+					osMutexRelease(playerMutexHandle);
+
+					FRESULT result = searchFilesInFolder();
+					osMutexAcquire(menuMutexHandle, osWaitForever);
+					if (result == FR_OK)
+					{
+						displayParams.menu = FILES;
+					}
+					else
+					{
+						displayParams.menu = START;
+					}
+					osMutexRelease(menuMutexHandle);
+					break;
+				}
+				case FILES:
+					// se debería reproducir el archivo actual
+					osMutexAcquire(playerMutexHandle, osWaitForever);
+					strncpy(audioPlayerOpts.filename,
+							fileBrowser.filenames[fileBrowser.selectedIndex],
+							sizeof(audioPlayerOpts.filename));
+					audioPlayerOpts.shouldLoadBuffer = TRUE;
+					audioPlayerOpts.isPlaying = TRUE;
+					osMutexRelease(playerMutexHandle);
+
+					osMutexAcquire(menuMutexHandle, osWaitForever);
+					displayParams.menu = START;
+					osMutexRelease(menuMutexHandle);
 					break;
 				default:
 					break;
@@ -931,12 +1156,11 @@ void handleButtonPress(void *argument)
 			}
 			else
 			{
-				lastInteractionTick = HAL_GetTick();
-
+				osMutexAcquire(menuMutexHandle, osWaitForever);
 				switch (displayParams.menu)
 				{
 				case MENU:
-				case EQUALIZER:
+				case EQUALIZER_MENU:
 				case EQUALIZER_HIGH:
 				case EQUALIZER_MID:
 				case EQUALIZER_LOW:
@@ -944,9 +1168,16 @@ void handleButtonPress(void *argument)
 				case FOLDER_SEARCH:
 					displayParams.menu = START;
 					break;
+				case FILES:
+					displayParams.menu = FILES_SEARCH;
+					break;
+				case EQUALIZER:
+					displayParams.menu = EQUALIZER_MENU;
+					break;
 				default:
 					break;
 				}
+				osMutexRelease(menuMutexHandle);
 			}
 
 			osDelay(50);
@@ -954,15 +1185,20 @@ void handleButtonPress(void *argument)
 		else if (HAL_GPIO_ReadPin(btnParams.port, btnParams.pin) == GPIO_PIN_SET && isButtonPressed == TRUE)
 		{
 			isButtonPressed = FALSE;
-			osDelay(1);
+			osDelay(10);
 		}
 
-		osDelay(10);
+#ifdef DEBUG_WATERMARK
+		uxHighWaterMark_TASK3 = uxTaskGetStackHighWaterMark(NULL);
+#endif
+
+		osDelay(20);
 	}
-	/* USER CODE END handleButtonPress */
+  /* USER CODE END handleButtonPress */
 }
 
 /* USER CODE BEGIN Header_handleEncoder */
+
 /**
  * @brief Function implementing the encoderTask thread.
  * @param argument: Not used
@@ -971,7 +1207,7 @@ void handleButtonPress(void *argument)
 /* USER CODE END Header_handleEncoder */
 void handleEncoder(void *argument)
 {
-	/* USER CODE BEGIN handleEncoder */
+  /* USER CODE BEGIN handleEncoder */
 
 	vTaskSetApplicationTaskTag(NULL, (void *)ENCONDER_TASK_TAG);
 
@@ -990,7 +1226,6 @@ void handleEncoder(void *argument)
 
 		if (curr != prev)
 		{
-			// osMutexAcquire(menuMutexHandle, osWaitForever);
 
 			int8_t direction = encoderTable[prev][curr];
 			prev = curr;
@@ -999,27 +1234,48 @@ void handleEncoder(void *argument)
 			{
 				lastInteractionTick = HAL_GetTick();
 
-				if (displayParams.menu == 0x1 && direction == -1)
+				osMutexAcquire(menuMutexHandle, osWaitForever);
+
+				if (displayParams.menu <= MENU && direction == -1)
 				{
-					displayParams.menu = DISPLAY_MENU_LENGTH - 1;
+					displayParams.menu = FILES_SEARCH;
 				}
 				else if (displayParams.menu == FILES_SEARCH && direction == 1)
 				{
-					displayParams.menu = 0x1;
+					displayParams.menu = MENU;
+				}
+				else if (displayParams.menu == FILES)
+				{
+					if (direction == 1 && fileBrowser.selectedIndex < (fileBrowser.fileCount - 1))
+						fileBrowser.selectedIndex = (fileBrowser.selectedIndex + 1) % fileBrowser.fileCount;
+					else if (direction == 1 && fileBrowser.selectedIndex >= (fileBrowser.fileCount - 1))
+						fileBrowser.selectedIndex = 0;
+					else if (direction == -1 && (fileBrowser.selectedIndex - 1) >= 0)
+						fileBrowser.selectedIndex = (fileBrowser.selectedIndex - 1) % fileBrowser.fileCount;
+					else if (direction == -1 && (fileBrowser.selectedIndex - 1) < 0)
+						fileBrowser.selectedIndex = fileBrowser.fileCount - 1;
+				}
+				else if (displayParams.menu == ERROR_STATE)
+				{
+					displayParams.menu = START;
 				}
 				else
 				{
 					displayParams.menu += direction;
 				}
-			}
 
-			// osMutexRelease(menuMutexHandle);
+				osMutexRelease(menuMutexHandle);
+			}
 		}
 
-		osDelay(1);
+#ifdef DEBUG_WATERMARK
+		uxHighWaterMark_TASK4 = uxTaskGetStackHighWaterMark(NULL);
+#endif
+
+		osDelay(20);
 	}
 
-	/* USER CODE END handleEncoder */
+  /* USER CODE END handleEncoder */
 }
 
 /* USER CODE BEGIN Header_handleMusicPlayer */
@@ -1031,9 +1287,10 @@ void handleEncoder(void *argument)
 /* USER CODE END Header_handleMusicPlayer */
 void handleMusicPlayer(void *argument)
 {
-	/* USER CODE BEGIN handleMusicPlayer */
+  /* USER CODE BEGIN handleMusicPlayer */
 	vTaskSetApplicationTaskTag(NULL, (void *)PLAYER_TASK_TAG);
 
+	// Se monta la SD y queda montada para siempre
 	fres = f_mount(&FatFs, "", FA_READ);
 	if (fres != FR_OK)
 	{
@@ -1043,94 +1300,124 @@ void handleMusicPlayer(void *argument)
 		Error_Handler();
 	}
 
-	// Se lee el archivo de prueba
-	// fres = f_open(&fil, audioPlayerOpts.filename, FA_READ);
-	fres = f_open(&fil, "test.wav", FA_READ);
-	if (fres != FR_OK)
-	{
-#ifdef DEBUG_SD
-		ACTIVATE_DEBUG_PIN();
-#endif
-		Error_Handler(); // File not found, path invalid, etc.
-	}
-
 	/* Infinite loop */
 	for (;;)
 	{
-		if (displayParams.menu != START && HAL_GetTick() - lastInteractionTick > 6000)
-		{
-			// osMutexAcquire(menuMutexHandle, osWaitForever);
-			displayParams.menu = START;
-			lastInteractionTick = HAL_GetTick();
-			// osMutexRelease(menuMutexHandle);
-		}
 
 		if (audioPlayerOpts.isPlaying && audioPlayerOpts.shouldLoadBuffer)
 		{
-			// osMutexAcquire(playerMutexHandle, osWaitForever);
 
-			// Ahora se lee la información del archivo de prueba
-			fres = f_read(&fil, mp3Buf, sizeof(mp3Buf), &bytesRead);
-			if (fres != FR_OK)
+			// Se tiene que abrir el archivo
+			if (!audioPlayerOpts.isReadingMusicFile)
 			{
-#ifdef DEBUG_SD
-				ACTIVATE_DEBUG_PIN();
-#endif
-				Error_Handler();
+				fres = f_open(&fil, audioPlayerOpts.filename, FA_READ);
+				if (fres != FR_OK)
+				{
+					osMutexAcquire(menuMutexHandle, osWaitForever);
+					strncpy(displayParams.errorMessage, ERROR_OPEN_FILE,
+							sizeof(displayParams.errorMessage));
+					displayParams.menu = ERROR_STATE;
+					osMutexRelease(menuMutexHandle);
+					continue;
+				}
+				audioPlayerOpts.isReadingMusicFile = TRUE;
 			}
 
-			// Se vuelve a reproducir el tema una vez que se leyó completamente
+			// Ahora se lee la información del archivo de prueba
+			fres = f_read(&fil, wavBuffer, sizeof(wavBuffer), &bytesRead);
+			if (fres != FR_OK)
+			{
+				osMutexAcquire(menuMutexHandle, osWaitForever);
+				strncpy(displayParams.errorMessage, ERROR_READING_AUDIO_FILE,
+						sizeof(displayParams.errorMessage));
+				displayParams.menu = ERROR_STATE;
+				osMutexRelease(menuMutexHandle);
+
+				osMutexAcquire(playerMutexHandle, osWaitForever);
+				audioPlayerOpts.isPlaying = FALSE;
+				osMutexRelease(playerMutexHandle);
+				continue;
+			}
+
 			if (bytesRead == 0)
 			{
 				f_lseek(&fil, 0);
 				continue;
 			}
 
-			// osMutexRelease(playerMutexHandle);
-
+			osMutexAcquire(playerMutexHandle, osWaitForever);
 			audioPlayerOpts.shouldLoadBuffer = FALSE;
+			osMutexRelease(playerMutexHandle);
 
 			// TODO: se debería cerrar el archivo, pero con un callback o algo así
 			// f_close(&fil);
 		}
 
 #ifdef DEBUG_WATERMARK
-		uxTaskGetStackHighWaterMark();
+		uxHighWaterMark_TASK5 = uxTaskGetStackHighWaterMark(NULL);
 #endif
 
 		osDelay(1);
 	}
-	/* USER CODE END handleMusicPlayer */
+  /* USER CODE END handleMusicPlayer */
+}
+
+/* USER CODE BEGIN Header_handleFFT */
+/**
+ * @brief Function implementing the transformTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_handleFFT */
+void handleFFT(void *argument)
+{
+  /* USER CODE BEGIN handleFFT */
+	/* Infinite loop */
+	for (;;)
+	{
+		osMutexAcquire(fftMutexHandle, osWaitForever);
+		FFT(wavBufferFFT, sizeof(wavBufferFFT));
+		osMutexRelease(fftMutexHandle);
+
+#ifdef DEBUG_WATERMARK
+	uxHighWaterMark_TASK6 = uxTaskGetStackHighWaterMark(NULL);
+#endif
+
+		osDelay(500);
+	}
+  /* USER CODE END handleFFT */
 }
 
 /**
- * @brief  Period elapsed callback in non blocking mode
- * @note   This function is called  when TIM4 interrupt took place, inside
- * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
- * a global variable "uwTick" used as application time base.
- * @param  htim : TIM handle
- * @retval None
- */
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM4 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	/* USER CODE BEGIN Callback 0 */
+  /* USER CODE BEGIN Callback 0 */
 
-	/* USER CODE END Callback 0 */
-	if (htim->Instance == TIM4)
-	{
-		HAL_IncTick();
-	}
-	/* USER CODE BEGIN Callback 1 */
-	/* USER CODE END Callback 1 */
+	freeHeap = xPortGetFreeHeapSize();
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM4)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+  /* USER CODE END Callback 1 */
 }
 
 /**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
 void Error_Handler(void)
 {
-	/* USER CODE BEGIN Error_Handler_Debug */
+  /* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
 	while (1)
@@ -1143,21 +1430,21 @@ void Error_Handler(void)
 			}
 		}
 	}
-	/* USER CODE END Error_Handler_Debug */
+  /* USER CODE END Error_Handler_Debug */
 }
 #ifdef USE_FULL_ASSERT
 /**
- * @brief  Reports the name of the source file and the source line number
- *         where the assert_param error has occurred.
- * @param  file: pointer to the source file name
- * @param  line: assert_param error line source number
- * @retval None
- */
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-	/* USER CODE BEGIN 6 */
+  /* USER CODE BEGIN 6 */
 	/* User can add his own implementation to report the file name and line number,
 	   ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-	/* USER CODE END 6 */
+  /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

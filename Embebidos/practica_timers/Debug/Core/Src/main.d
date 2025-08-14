@@ -44,7 +44,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/fonts.h ../Core/Inc/ssd1306.h ../Core/Inc/fonts.h \
  ../Core/Inc/user_diskio_spi.h \
  ../Middlewares/Third_Party/FatFs/src/integer.h \
- ../Middlewares/Third_Party/FatFs/src/diskio.h ../Core/Inc/musica.h
+ ../Middlewares/Third_Party/FatFs/src/diskio.h \
+ ../Core/Inc/error_messages.h ../Core/Inc/fft.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal.h:
 ../Core/Inc/stm32f1xx_hal_conf.h:
@@ -98,4 +99,5 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/user_diskio_spi.h:
 ../Middlewares/Third_Party/FatFs/src/integer.h:
 ../Middlewares/Third_Party/FatFs/src/diskio.h:
-../Core/Inc/musica.h:
+../Core/Inc/error_messages.h:
+../Core/Inc/fft.h:

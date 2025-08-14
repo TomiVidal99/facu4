@@ -40,12 +40,16 @@ extern "C" {
   {
     START = 0x0,
     MENU = 0x1,
-    EQUALIZER = 0x2,
+    EQUALIZER_MENU = 0x2,
     EQUALIZER_HIGH = 0x3,
     EQUALIZER_MID = 0x4,
     EQUALIZER_LOW = 0x5,
     FOLDER_SEARCH = 0x6,
     FILES_SEARCH = 0x7,
+    FILES = 0x8,
+    DIRECTORIES = 0x9,
+    ERROR_STATE = 0x10,
+    EQUALIZER = 0x11,
 
     DISPLAY_MENU_LENGTH,
   } DisplayMenu;
@@ -53,6 +57,7 @@ extern "C" {
   typedef struct
   {
     DisplayMenu menu;
+    char errorMessage[64];
   } DisplayParams;
 
   typedef enum
@@ -74,12 +79,26 @@ extern "C" {
     uint16_t pin;
   } ButtonParams;
 
-  typedef struct {
-  	Bool isPlaying;
-    char filename[32];
-    int bufIndex;
+#define MAX_FILES 10
+#define FILE_NAME_LENGTH 16
+#define FILEPATHS_LENGTH 16
+  typedef struct
+  {
+    char filenames[MAX_FILES][FILE_NAME_LENGTH];
+    uint16_t fileCount;
+    uint16_t selectedIndex;
+  } FileBrowser;
+
+  typedef struct
+  {
+    Bool isPlaying;
     Bool shouldLoadBuffer;
+    Bool isReadingMusicFile;
+    char filename[FILE_NAME_LENGTH];
+    int bufIndex;
+    char currentPath[FILEPATHS_LENGTH];
   } AudioPlayerOptions;
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -128,6 +147,8 @@ void Error_Handler(void);
 #define DEBUG_TASK_PLAYER_GPIO_Port GPIOA
 #define DEBUG_TASK_MENU_Pin GPIO_PIN_12
 #define DEBUG_TASK_MENU_GPIO_Port GPIOA
+#define DEBUG_TASK_BUTTONS_Pin GPIO_PIN_15
+#define DEBUG_TASK_BUTTONS_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

@@ -64,7 +64,7 @@
 #define configTICK_RATE_HZ                       ((TickType_t)1000)
 #define configMAX_PRIORITIES                     ( 56 )
 #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
-#define configTOTAL_HEAP_SIZE                    ((size_t)6012)
+#define configTOTAL_HEAP_SIZE                    ((size_t)7200)
 #define configMAX_TASK_NAME_LEN                  ( 16 )
 #define configUSE_TRACE_FACILITY                 1
 #define configUSE_16_BIT_TICKS                   0
@@ -159,13 +159,14 @@ standard names. */
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
 #include "main.h"
-void callback(int, Bool);
-#define traceTASK_SWITCHED_IN() callback((int)pxCurrentTCB->pxTaskTag, TRUE)
-#define traceTASK_SWITCHED_OUT() callback((int)pxCurrentTCB->pxTaskTag, FALSE)
+void debug_callback(int, Bool);
+#define traceTASK_SWITCHED_IN() debug_callback((int)pxCurrentTCB->pxTaskTag, TRUE)
+#define traceTASK_SWITCHED_OUT() debug_callback((int)pxCurrentTCB->pxTaskTag, FALSE)
 #define PLAYER_TASK_TAG 0
 #define MENU_TASK_TAG 1
 #define ENCONDER_TASK_TAG 2
 #define DEFAULT_TASK_TAG 3
+#define BUTTONS_TASK_TAG 4
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */
