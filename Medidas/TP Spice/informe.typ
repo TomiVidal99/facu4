@@ -66,6 +66,10 @@
     image("Imagenes/1-sistema.png", width: 100%),
     caption: [Circuito en LTSpice completo],
   )
+  #figure(
+    image("Imagenes/1-tensiones.png", width: 100%),
+    caption: [Tensiones en el circuito dado],
+  )
 
   La corriente del neutro y parámetros similares se pueden obtener en la simulación, a continuación se ve como efectivamente hay una alta corriente en el neutro.
   #figure(
