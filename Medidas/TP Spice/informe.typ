@@ -73,22 +73,14 @@
     caption: [Corriente del neutro],
   )
 
-  Se identificó que el problema de la corriente en el neutro (1.78A RMS) que es debido al tercer armónico. Esto se verificó quitando cada armónico individualmente, como se muestra a continuación en las capturas.
+  Se identificó que el problema de la corriente en el neutro ($36 A_"RMS"$) que es debido al tercer armónico. Esto se verificó quitando cada armónico individualmente, como se muestra a continuación en las capturas.
 
   #figure(
-    image("Imagenes/1-sin_3ro.png", width: 100%),
+    image("Imagenes/1-sin_armonicos.png", width: 100%),
     caption: [Simulación sin el tercer armónico],
   )
-  #figure(
-    image("Imagenes/1-sin_5to.png", width: 100%),
-    caption: [Simulación sin el quinto armónico],
-  )
-  #figure(
-    image("Imagenes/1-sin_9no.png", width: 100%),
-    caption: [Simulación sin el noveno armónico],
-  )
 
-  Como se puede ver, sólo cuando se remueve el tercer armónico se elimina la corriente en el neutro. Una posible solución a este problema sería hacer un filtro que lo elimine.
+  Como se puede ver, sólo cuando se remueven los armónicos se elimina la corriente en el neutro. Una posible solución es simplemente eliminar el nuetro.
 
   Para calcular la potencia activa, aparente y factor de potencia, se emplearon las directivas de LTSpice, que permiten efectuar cálculos basados en las simulaciones.
 
@@ -103,18 +95,18 @@
         columns: (auto, auto),
         align: (center, center),
         [*Parámetro*], [*Valor*],
-        [$P_R$], [11846W],
-        [$P_S$], [11811W],
-        [$P_T$], [11835W],
-        [$P_"Total"$], [6200573W],
-        [$U_R$], [206V],
-        [$U_S$], [206V],
-        [$U_T$], [206V],
-        [$I_R$], [84.8A],
-        [$I_S$], [84.8A],
-        [$I_T$], [84.4A],
-        [S], [52367.5255865VA],
-        [FP], [0.677760212709],
+        [$P_R$], [12012W],
+        [$P_S$], [12012W],
+        [$P_T$], [12012W],
+        [$P_"Total"$], [36038W],
+        [$U_R$], [205V],
+        [$U_S$], [205V],
+        [$U_T$], [205V],
+        [$I_R$], [80A],
+        [$I_S$], [80A],
+        [$I_T$], [80A],
+        [S], [49646VA],
+        [FP], [0.73],
       ),
       caption: [Parámetros pedidos en el ejercicio],
       placement: top,
@@ -133,11 +125,11 @@
       table(
         columns: (auto, auto),
         align: (center, center),
-        [*Capacidad [uF]*], [*FP*],
-        [1100], [0.677],
-        [770], [0.782],
-        [1430], [0.72],
-        [150], [0.862],
+        [*Capacidad [F]*], [*FP*],
+        [500p], [0.8379],
+        [100u], [0.8576],
+        [470u], [0.8969],
+        [1000u], [0.708],
       ),
       caption: [Factor de potencia para varios valores del capacitor],
       placement: top,
@@ -182,7 +174,7 @@
         columns: (auto, auto, auto, auto),
         align: (center, center, center, center),
         [*Corriente Máxima*], [*Corriente RMS*], [*Potencia Máxima*], [*Potencia Media*],
-        [5.0674A], [2.7962A], [152.697W], [319.82mW],
+        [5.06A], [2.75A], [261.35W], [76.64mW],
       ),
       caption: [Corriente y potencia del capacitor],
       placement: top,
@@ -227,7 +219,7 @@
   = Problema 4
   Se hicieron varios circuitos para poder resolver el problema dado. El uno de los circuitos es con diodos "reales" (tiene alinealidades), otro con diodos "ideales" (sin alinealidades) y otro donde se iteran valores del valor efectivo de la fuente para ver cuando se cumple el error de las alinealidades menor al 5%.
 
-  Con los datos provistos para el problema, se puede calcular la resistencia multiplicadora que resulta en R_m=4451.58#sym.Omega aproximadamente. Con esta resistencia R_m en serie a los 50#sym.Omega se puede verificar en la simulación que la corriente máxima no se alcanza, satisfaciendo las condiciones requeridas.
+  Con los datos provistos para el problema, se puede calcular la resistencia multiplicadora, pero debido a las imperfecciones de los diodos no se llega al valor deseado, por lo que se iteraron valores de la resistencia hasta llegar al valor deseado, que resultó en $R_m=3907,5#sym.Omega$ aproximadamente. Con esta resistencia $R_m$ en serie a los 50#sym.Omega se puede verificar en la simulación que la corriente máxima se alcanza perfectamente, satisfaciendo las condiciones requeridas.
 
   #figure(
     image("Imagenes/4-circuito_base.png", width: 100%),
@@ -244,14 +236,12 @@
         columns: (auto, auto, auto),
         align: (center, center, center),
         [], [*Diodos "reales"*], [*Diodos "ideales"*],
-        [*Corriente ($#sym.mu A$)*], [761.67], [994.08],
+        [*Corriente ($m A$)*], [1,001], [1,1309],
       ),
       caption: [Corrientes en la resistencia de $50#sym.Omega$],
       placement: top,
     )
   ]
-
-  Como se puede observar en la tabla anterior la no linealidad hace que se reduzca la corriente, pero el cálculo de la resistencia es correcto, ya que cuando se emplean los diodos _ideales_, la corriente es prácticamente *1mA* ($994.08#sym.mu A$).
 
   Luego se iteraron valores de tensión eficaz en la entrada, considerando que la sinusoide tiene V$sqrt(2)$ (donde V es en Volts eficaces), y se midió la tensión eficaz a la salida, y haciendo el cálculo del error ($e=frac(V_"entrada"-V_"salida", V_"entrada")$), en la siguiene tabla se observan los resultados.
 
@@ -266,8 +256,6 @@
         columns: (auto, auto, auto),
         align: (center, center, center),
         [*Entrada [$V_text("ef")$]*], [*Salida [$V_text("ef")$]*], [*Error [%]*],
-        [19.8821], [18.7225], [5.8328],
-        [21.8714], [20.7019], [5.4725],
         [23.8546], [22.6796], [4.9952],
         [25.8482], [24.6165], [4.5906],
         [27.8358], [26.6415], [4.2898],
