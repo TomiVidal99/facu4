@@ -17,34 +17,27 @@
 
 #include "nrf24l01.h"
 
-#include "definitions.h"
 #include "UART.h"
 
-#define DEBUG
-
+void setup_timer(void);
 nRF24L01 *setup_rf(void);
 
 volatile bool rf_interrupt = false;
-// El tamaño es 7 porque hay un caracter al final \0
-char STATE[7] = "SSSAAA"; // example: +100180 -> velocidad 100 adelante, rotar 180 grados
+volatile bool send_message = false;
 
-#ifdef DEBUG
 char *sender_message = "Sender started...\n\r";
-#endif
 
 int main(void)
 {
-#ifdef DEBUG
   USART_init();
   USART_putstring(sender_message);
   sprintf(sender_message, "Sending message\n\r");
-#endif
-
-  adc_init();
 
   uint8_t to_address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
+  bool on = false;
   sei();
   nRF24L01 *rf = setup_rf();
+  setup_timer();
 
   while (true)
   {
@@ -56,22 +49,20 @@ int main(void)
         nRF24L01_flush_transmit_message(rf);
     }
 
-    uint8_t speed = adc_read(0);
-    uint8_t angle = adc_read(1);
+    if (send_message)
+    {
+      USART_putstring(sender_message);
 
-#ifdef DEBUG
-    sprintf(STATE, "%03d%03d", speed, angle);
-    USART_putstring(sender_message);
-#endif
-
-#ifdef DEBUG
-    sprintf(sender_message, "%s\r\n", STATE);
-    USART_putstring(sender_message);
-#endif
-    nRF24L01Message msg;
-    memcpy(msg.data, STATE, 6);
-    msg.length = strlen((char *)msg.data) + 1;
-    nRF24L01_transmit(rf, to_address, &msg);
+      send_message = false;
+      on = !on;
+      nRF24L01Message msg;
+      if (on)
+        memcpy(msg.data, "ON", 3);
+      else
+        memcpy(msg.data, "OFF", 4);
+      msg.length = strlen((char *)msg.data) + 1;
+      nRF24L01_transmit(rf, to_address, &msg);
+    }
   }
 
   return 0;
@@ -97,23 +88,23 @@ nRF24L01 *setup_rf(void)
   return rf;
 }
 
+// setup timer to trigger interrupt every second when at 1MHz
+void setup_timer(void)
+{
+  TCCR1B |= _BV(WGM12);
+  TIMSK1 |= _BV(OCIE1A);
+  OCR1A = 15624;
+  TCCR1B |= _BV(CS10) | _BV(CS11);
+}
+
+// each one second interrupt
+ISR(TIMER1_COMPA_vect)
+{
+  send_message = true;
+}
+
 // nRF24L01 interrupt
 ISR(INT0_vect)
 {
   rf_interrupt = true;
-}
-
-void adc_init()
-{
-  ADMUX |= (1 << REFS0);                                              // Use AVcc as voltage reference
-  ADCSRA |= (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Enable ADC, prescaler 128
-}
-
-uint8_t adc_read(uint8_t channel)
-{
-  ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
-  ADCSRA |= (1 << ADSC);
-  while (ADCSRA & (1 << ADSC))
-    ;
-  return (uint8_t)((ADC * 100UL) / 1023);
 }

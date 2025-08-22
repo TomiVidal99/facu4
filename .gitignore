@@ -27,3 +27,7 @@ Embebidos/codigos/practica1_ej7/Core/.project
 Embebidos/codigos/practica1_ej7/.settings/language.settings.xml
 Embebidos/codigos/practica1_ej7/.settings/stm32cubeide.project.prefs
 slprj
+*.log
+*.raw
+*.db
+*.net

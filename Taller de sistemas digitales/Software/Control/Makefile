@@ -12,8 +12,9 @@ F_CPU = 16000000UL
 PROGRAMMER = arduino
 CONFIG_FILE = "D:\AVRDUDE\avrdude.conf" 
 BAUD = 57600
+# BAUD = 115200
 AVRDUDE = "D:\AVRDUDE\avrdude.exe"
-COM_PORT = COM3
+COM_PORT = COM7
 
 # Source files
 SRC = src/*.c

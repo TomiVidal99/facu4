@@ -62,8 +62,8 @@
 // se puede elegir que es lo que se prubea para aislar los errores
 #define DEBUG_WATERMARK // Debug para ver el tamaño del stack de cada tarea
 #define ACTIVATE_DEBUG_PIN() (HAL_GPIO_TogglePin(DEBUG_ERROR_HANDLERB10_GPIO_Port, DEBUG_ERROR_HANDLERB10_Pin))
-// #define DEBUG_SD
-#define DEBUG_TASKS
+#define DEBUG_SD
+// #define DEBUG_TASKS
 #define AUDIO_BUFFER_SIZE 32
 // #define DEBUG_SCREEN
 
@@ -101,7 +101,7 @@ const osThreadAttr_t menuTask_attributes = {
 osThreadId_t acceptButtonTasHandle;
 const osThreadAttr_t acceptButtonTas_attributes = {
   .name = "acceptButtonTas",
-  .stack_size = 300 * 4,
+  .stack_size = 200 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for cancelButtonTas */
@@ -115,7 +115,7 @@ const osThreadAttr_t cancelButtonTas_attributes = {
 osThreadId_t encoderTaskHandle;
 const osThreadAttr_t encoderTask_attributes = {
   .name = "encoderTask",
-  .stack_size = 128 * 4,
+  .stack_size = 200 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for musicPlayer */
@@ -1297,7 +1297,7 @@ void handleMusicPlayer(void *argument)
 #ifdef DEBUG_SD
 		ACTIVATE_DEBUG_PIN();
 #endif
-		Error_Handler();
+	Error_Handler();
 	}
 
 	/* Infinite loop */

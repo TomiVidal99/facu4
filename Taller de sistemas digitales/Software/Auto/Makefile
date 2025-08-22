@@ -12,6 +12,7 @@ F_CPU = 16000000UL
 PROGRAMMER = arduino
 CONFIG_FILE = "D:\AVRDUDE\avrdude.conf" 
 BAUD = 115200
+# BAUD = 57600
 AVRDUDE = "D:\AVRDUDE\avrdude.exe"
 COM_PORT = COM4
 
