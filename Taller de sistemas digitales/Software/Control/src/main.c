@@ -17,27 +17,33 @@
 
 #include "nrf24l01.h"
 
+#include "definitions.h"
 #include "UART.h"
 
-void setup_timer(void);
+#define DEBUG
+
 nRF24L01 *setup_rf(void);
 
 volatile bool rf_interrupt = false;
-volatile bool send_message = false;
+char STATE[6] = "SSSAAA"; // example: +100180 -> velocidad 100 adelante, rotar 180 grados
 
+#ifdef DEBUG
 char *sender_message = "Sender started...\n\r";
+#endif
 
 int main(void)
 {
+#ifdef DEBUG
   USART_init();
   USART_putstring(sender_message);
   sprintf(sender_message, "Sending message\n\r");
+#endif
+
+  adc_init();
 
   uint8_t to_address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
-  bool on = false;
   sei();
   nRF24L01 *rf = setup_rf();
-  setup_timer();
 
   while (true)
   {
@@ -49,20 +55,19 @@ int main(void)
         nRF24L01_flush_transmit_message(rf);
     }
 
-    if (send_message)
-    {
-      USART_putstring(sender_message);
+    uint8_t speed = adc_read(0);
+    uint8_t angle = adc_read(1);
 
-      send_message = false;
-      on = !on;
-      nRF24L01Message msg;
-      if (on)
-        memcpy(msg.data, "ON", 3);
-      else
-        memcpy(msg.data, "OFF", 4);
-      msg.length = strlen((char *)msg.data) + 1;
-      nRF24L01_transmit(rf, to_address, &msg);
-    }
+    sprintf(STATE, "%03d%03d", speed, angle);
+
+#ifdef DEBUG
+    sprintf(sender_message, "%s\r\n", STATE);
+    USART_putstring(sender_message);
+#endif
+    nRF24L01Message msg;
+    memcpy(msg.data, STATE, 6);
+    msg.length = strlen((char *)msg.data) + 1;
+    nRF24L01_transmit(rf, to_address, &msg);
   }
 
   return 0;
@@ -88,23 +93,23 @@ nRF24L01 *setup_rf(void)
   return rf;
 }
 
-// setup timer to trigger interrupt every second when at 1MHz
-void setup_timer(void)
-{
-  TCCR1B |= _BV(WGM12);
-  TIMSK1 |= _BV(OCIE1A);
-  OCR1A = 15624;
-  TCCR1B |= _BV(CS10) | _BV(CS11);
-}
-
-// each one second interrupt
-ISR(TIMER1_COMPA_vect)
-{
-  send_message = true;
-}
-
 // nRF24L01 interrupt
 ISR(INT0_vect)
 {
   rf_interrupt = true;
+}
+
+void adc_init()
+{
+  ADMUX |= (1 << REFS0);                                              // Use AVcc as voltage reference
+  ADCSRA |= (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Enable ADC, prescaler 128
+}
+
+uint8_t adc_read(uint8_t channel)
+{
+  ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
+  ADCSRA |= (1 << ADSC);
+  while (ADCSRA & (1 << ADSC))
+    ;
+  return (uint8_t)((ADC * 100UL) / 1023);
 }
