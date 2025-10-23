@@ -14,105 +14,149 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "definitions.h"
+
+#include "motors.h"
+
 #include "UART.h"
 
 #include "nrf24l01.h"
 #include "nrf24l01-mnemonics.h"
 
-nRF24L01 *setup_rf(void);
-void process_message(char *message);
- void prepare_led_pin(void);
- void set_led_high(void);
- void set_led_low(void);
+#include "servo.h"
+
+#define DEBUG
+
+#define MAX_SPEED 160
+#define DEFAULT_ANGLE 88
+#define DEFLEXION_ANGLE 25
+#define MIN_ANGLE (DEFAULT_ANGLE-DEFLEXION_ANGLE)
+#define MAX_ANGLE (DEFAULT_ANGLE+DEFLEXION_ANGLE)
+
+#define COMMS_TIMEDOUT 600000 // 30 segundos
 
 volatile bool rf_interrupt = false;
+volatile uint32_t comms_inactive_counter = 0;
 
+#ifdef DEBUG
 char *recv_message = "Receiver started...\n\r";
+#endif
 
 int main(void)
 {
-  USART_init();
-  USART_putstring(recv_message);
+#ifdef DEBUG
+    USART_init();
+    USART_putstring(recv_message);
+#endif
 
-  uint8_t address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
-  prepare_led_pin();
-  sei();
-  nRF24L01 *rf = setup_rf();
-  nRF24L01_listen(rf, 0, address);
-  uint8_t addr[5];
-  nRF24L01_read_register(rf, CONFIG, addr, 1);
+    init_motors_pwm();
+    SERVO_init();
+    SERVO_set_angle(90);
 
-  while (true)
-  {
-    if (rf_interrupt)
+    // Settings for the nRF24
+    uint8_t address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
+    sei();
+    nRF24L01 *rf = setup_rf();
+    nRF24L01_listen(rf, 0, address);
+    uint8_t addr[5];
+    nRF24L01_read_register(rf, CONFIG, addr, 1);
+
+    while (true)
     {
-      rf_interrupt = false;
-      while (nRF24L01_data_received(rf))
-      {
-        nRF24L01Message msg;
-        nRF24L01_read_received_data(rf, &msg);
-        process_message((char *)msg.data);
-      }
+        if (rf_interrupt)
+        {
+            rf_interrupt = false;
+            while (nRF24L01_data_received(rf))
+            {
+                nRF24L01Message msg;
+                nRF24L01_read_received_data(rf, &msg);
+                process_message((char *)msg.data);
+            }
 
-      nRF24L01_listen(rf, 0, address);
+            nRF24L01_listen(rf, 0, address);
+        }
     }
-  }
 
-  return 0;
+    return 0;
+}
+
+ISR(TIMER2_COMPA_vect)
+{
+    comms_inactive_counter++;
+    if (comms_inactive_counter > COMMS_TIMEDOUT)
+    {
+        OCR0B = 0;
+        OCR0A = 0;
+        SERVO_set_angle(DEFAULT_ANGLE);
+    }
+    SERVO_update();
 }
 
 nRF24L01 *setup_rf(void)
 {
-  nRF24L01 *rf = nRF24L01_init();
-  rf->ss.port = &PORTB;
-  rf->ss.pin = PB2; // 10
-  rf->ce.port = &PORTB;
-  rf->ce.pin = PB1; // 9
-  rf->sck.port = &PORTB;
-  rf->sck.pin = PB5; //  13
-  rf->mosi.port = &PORTB;
-  rf->mosi.pin = PB3; // 11
-  rf->miso.port = &PORTB;
-  rf->miso.pin = PB4; // 12
-  // interrupt on falling edge of INT0 (PD2)
-  EICRA |= _BV(ISC01);
-  EIMSK |= _BV(INT0);
-  nRF24L01_begin(rf);
-  return rf;
+    nRF24L01 *rf = nRF24L01_init();
+    rf->ss.port = &PORTB;
+    rf->ss.pin = PB2; // 10
+    rf->ce.port = &PORTB;
+    rf->ce.pin = PB1; // 9
+    rf->sck.port = &PORTB;
+    rf->sck.pin = PB5; //  13
+    rf->mosi.port = &PORTB;
+    rf->mosi.pin = PB3; // 11
+    rf->miso.port = &PORTB;
+    rf->miso.pin = PB4; // 12
+    // interrupt on falling edge of INT0 (PD2)
+    EICRA |= _BV(ISC01);
+    EIMSK |= _BV(INT0);
+    nRF24L01_begin(rf);
+    return rf;
 }
 
 void process_message(char *message)
 {
-  if (strcmp(message, "ON") == 0)
-    set_led_high();
-  else if (strcmp(message, "OFF") == 0)
-    set_led_low();
-}
+    uint16_t speed_percentage;
+    uint16_t angle_percentage;
+    sscanf(message, "%3u%3u", &angle_percentage, &speed_percentage);
 
- void prepare_led_pin(void)
-{
-  DDRB |= _BV(PB0);
-  PORTB &= ~_BV(PB0);
-}
+    comms_inactive_counter = 0;
 
- void set_led_high(void)
-{
-  PORTB |= _BV(PB0);
+#ifdef DEBUG
+    sprintf(recv_message, "Message: %s\n\r\t", message);
+    USART_putstring(recv_message);
+#endif
 
-  sprintf(recv_message, "HIGH\r\n");
-  USART_putstring(recv_message);
-}
+    if (speed_percentage > 65)
+    {
+        OCR0A = 0;
+        OCR0B = MAX_SPEED * (speed_percentage);
+    }
+    else if (speed_percentage < 35)
+    {
+        OCR0B = 0;
+        OCR0A = MAX_SPEED * (1 - speed_percentage);
+    }
+    else
+    {
+        OCR0A = 0;
+        OCR0B = 0;
+    }
 
- void set_led_low(void)
-{
-  PORTB &= ~_BV(PB0);
-
-  sprintf(recv_message, "LOW\n\r");
-  USART_putstring(recv_message);
+    if (angle_percentage > 65)
+    {
+        SERVO_set_angle(MAX_ANGLE * angle_percentage / 100);
+    }
+    else if (angle_percentage < 35)
+    {
+        SERVO_set_angle((MIN_ANGLE * (1 - angle_percentage)) / 100);
+    }
+    else
+    {
+        SERVO_set_angle(DEFAULT_ANGLE);
+    }
 }
 
 // nRF24L01 interrupt
 ISR(INT0_vect)
 {
-  rf_interrupt = true;
+    rf_interrupt = true;
 }
