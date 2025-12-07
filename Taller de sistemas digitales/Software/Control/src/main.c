@@ -101,8 +101,8 @@ ISR(INT0_vect)
 
 void adc_init()
 {
-  ADMUX |= (1 << REFS0);                                              // Use AVcc as voltage reference
-  ADCSRA |= (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Enable ADC, prescaler 128
+  ADMUX |= (1 << REFS0);
+  ADCSRA |= (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 }
 
 uint8_t adc_read(uint8_t channel)

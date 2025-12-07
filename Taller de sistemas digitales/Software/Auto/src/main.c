@@ -114,18 +114,15 @@ nRF24L01 *setup_rf(void)
 
 void process_message(char *message)
 {
-    // uint16_t speed_percentage;
-    // uint16_t angle_percentage;
-    // sscanf(message, "%3u%3u", &angle_percentage, &speed_percentage);
-    sscanf(message, "a");
+    uint16_t speed_percentage;
+    uint16_t angle_percentage;
+    sscanf(message, "%3u%3u", &angle_percentage, &speed_percentage);
 
     comms_inactive_counter = 0;
 
-    USART_putstring("test");
-
 #ifdef DEBUG
-    // sprintf(recv_message, "Message: %s\n\r\t", message);
-    // USART_putstring(recv_message);
+    sprintf(recv_message, "Message: %s\n\r\t", message);
+    USART_putstring(recv_message);
 #endif
 
     // if (speed_percentage > 65)
