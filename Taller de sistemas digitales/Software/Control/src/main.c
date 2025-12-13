@@ -25,7 +25,7 @@
 nRF24L01 *setup_rf(void);
 
 volatile bool rf_interrupt = false;
-char STATE[6] = "SSSAAA"; // example: +100180 -> velocidad 100 adelante, rotar 180 grados
+char STATE[7] = "SSSAAA\n"; // example: +100180 -> velocidad 100 adelante, rotar 180 grados
 
 #ifdef DEBUG
 char *sender_message = "Sender started...\n\r";

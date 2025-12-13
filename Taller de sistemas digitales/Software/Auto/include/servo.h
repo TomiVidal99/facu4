@@ -18,7 +18,14 @@
  * These times are all thought to be for a 16MHz clock
  */
 
+
+/**
+ * IMPORTANT: the init should have the sei()
+ * but since it's used for the NRF24, it's called later
+ * if not used for this case, it should be called after init
+ */
 void SERVO_init(void);
+
 void SERVO_set_angle(uint8_t degrees);
 void SERVO_update();
 

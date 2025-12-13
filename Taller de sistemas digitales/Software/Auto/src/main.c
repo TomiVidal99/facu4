@@ -13,6 +13,7 @@
 #include <avr/interrupt.h>
 #include <stdbool.h>
 #include <string.h>
+#include <util/delay.h>
 
 #include "definitions.h"
 
@@ -30,8 +31,8 @@
 #define MAX_SPEED 255
 #define DEFAULT_ANGLE 88
 #define DEFLEXION_ANGLE 25
-#define MIN_ANGLE (DEFAULT_ANGLE-DEFLEXION_ANGLE)
-#define MAX_ANGLE (DEFAULT_ANGLE+DEFLEXION_ANGLE)
+#define MIN_ANGLE (DEFAULT_ANGLE - DEFLEXION_ANGLE)
+#define MAX_ANGLE (DEFAULT_ANGLE + DEFLEXION_ANGLE)
 
 #define COMMS_TIMEDOUT 600000 // 30 segundos
 
@@ -49,9 +50,9 @@ int main(void)
     USART_putstring(recv_message);
 #endif
 
-    // init_motors_pwm();
-    // SERVO_init();
-    // SERVO_set_angle(90);
+    init_motors_pwm();
+    SERVO_init();
+    SERVO_set_angle(90);
 
     // Settings for the nRF24
     uint8_t address[5] = {0x01, 0x01, 0x01, 0x01, 0x01};
@@ -121,38 +122,42 @@ void process_message(char *message)
     comms_inactive_counter = 0;
 
 #ifdef DEBUG
-    sprintf(recv_message, "Message: %s\n\r\t", message);
+    sprintf(recv_message, "'%s' %u - %u \n\r", message, speed_percentage, angle_percentage);
     USART_putstring(recv_message);
 #endif
 
-    // if (speed_percentage > 65)
-    // {
-    //     OCR0A = MAX_SPEED * (speed_percentage);
-    //     OCR0B = 0;
-    // }
-    // else if (speed_percentage < 35)
-    // {
-    //     OCR0B = MAX_SPEED * (1 - speed_percentage);
-    //     OCR0A = 0;
-    // }
-    // else
-    // {
-    //     OCR0A = 0;
-    //     OCR0B = 0;
-    // }
+    if (speed_percentage > 65)
+    {
+        OCR0B = 0;
+        _delay_us(10);
+        OCR0A = MAX_SPEED;
+        // OCR0A = MAX_SPEED * speed_percentage;
+    }
+    else if (speed_percentage < 35)
+    {
+        OCR0A = 0;
+        _delay_us(10);
+        OCR0B = MAX_SPEED * (1 - speed_percentage);
+    }
+    else
+    {
+        OCR0A = 0;
+        OCR0B = 0;
+    }
 
-    // if (angle_percentage > 65)
-    // {
-    //     SERVO_set_angle(MAX_ANGLE * angle_percentage / 100);
-    // }
-    // else if (angle_percentage < 35)
-    // {
-    //     SERVO_set_angle((MIN_ANGLE * (1 - angle_percentage)) / 100);
-    // }
-    // else
-    // {
-    //     SERVO_set_angle(DEFAULT_ANGLE);
-    // }
+    if (angle_percentage > 65)
+    {
+        // SERVO_set_angle(MAX_ANGLE * angle_percentage / 100);
+        SERVO_set_angle(MAX_ANGLE);
+    }
+    else if (angle_percentage < 35)
+    {
+        SERVO_set_angle(MIN_ANGLE);
+    }
+    else
+    {
+        SERVO_set_angle(DEFAULT_ANGLE);
+    }
 }
 
 // nRF24L01 interrupt

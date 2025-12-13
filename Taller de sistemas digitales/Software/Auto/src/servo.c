@@ -11,7 +11,6 @@ void SERVO_init(void)
     TCCR2B = (1 << CS21);
     OCR2A = 99;
     TIMSK2 = (1 << OCIE2A);
-    sei();
 
     DDRD |= (1 << PD7);
 
