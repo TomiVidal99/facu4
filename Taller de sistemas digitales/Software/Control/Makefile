@@ -13,7 +13,7 @@ PROGRAMMER = arduino
 CONFIG_FILE = "C:\Users\tomii\Downloads\avrdude.conf" 
 BAUD = 57600
 AVRDUDE = "C:\Users\tomii\Downloads\avrdude.exe"
-COM_PORT = COM6
+COM_PORT = COM7
 
 # Source files
 SRC = src/*.c
@@ -58,6 +58,9 @@ flash: $(HEX)
 # Clean up build directory
 clean:
 	if exist $(BUILD_DIR) del /Q $(BUILD_DIR)\*
+
+serial:
+	putty -serial $(COM_PORT)
 
 # Phony targets
 .PHONY: all clean flash

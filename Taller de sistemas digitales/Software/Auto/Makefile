@@ -56,6 +56,9 @@ $(HEX): $(ELF)
 flash: $(HEX)
 	$(AVRDUDE) -c $(PROGRAMMER) -C $(CONFIG_FILE) -p $(MCU) -P$(COM_PORT) -b $(BAUD) -U flash:w:$(HEX):i
 
+serial:
+	putty -serial $(COM_PORT)
+
 # Clean up build directory
 clean:
 	if exist $(BUILD_DIR) del /Q $(BUILD_DIR)\*

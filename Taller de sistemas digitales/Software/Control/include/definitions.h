@@ -14,3 +14,6 @@ void init_button_interrupt();
 
 void adc_init();
 uint8_t adc_read(uint8_t channel);
+uint16_t adc_read_raw(uint8_t channel);
+
+void calibrate_potenciometer(uint8_t channel);
