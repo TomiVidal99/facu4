@@ -29,8 +29,9 @@
 #define DEBUG
 
 #define MAX_SPEED 255
+#define MID_SPEED 200
 #define DEFAULT_ANGLE 88
-#define DEFLEXION_ANGLE 25
+#define DEFLEXION_ANGLE 15
 #define MIN_ANGLE (DEFAULT_ANGLE - DEFLEXION_ANGLE)
 #define MAX_ANGLE (DEFAULT_ANGLE + DEFLEXION_ANGLE)
 
@@ -126,18 +127,27 @@ void process_message(char *message)
     USART_putstring(recv_message);
 #endif
 
-    if (speed_percentage > 65)
+    if (speed_percentage > 85)
     {
         OCR0B = 0;
         _delay_us(10);
         OCR0A = MAX_SPEED;
-        // OCR0A = MAX_SPEED * speed_percentage;
     }
-    else if (speed_percentage < 35)
+    else if (speed_percentage > 70) {
+        OCR0B = 0;
+        _delay_us(10);
+        OCR0A = MID_SPEED;
+    }
+    else if (speed_percentage < 30) {
+        OCR0A = 0;
+        _delay_us(10);
+        OCR0B = MID_SPEED;
+    }
+    else if (speed_percentage < 15)
     {
         OCR0A = 0;
         _delay_us(10);
-        OCR0B = MAX_SPEED * (1 - speed_percentage);
+        OCR0B = MAX_SPEED;
     }
     else
     {
@@ -145,12 +155,12 @@ void process_message(char *message)
         OCR0B = 0;
     }
 
-    if (angle_percentage > 65)
+    if (angle_percentage > 80)
     {
         // SERVO_set_angle(MAX_ANGLE * angle_percentage / 100);
         SERVO_set_angle(MAX_ANGLE);
     }
-    else if (angle_percentage < 35)
+    else if (angle_percentage < 20)
     {
         SERVO_set_angle(MIN_ANGLE);
     }
